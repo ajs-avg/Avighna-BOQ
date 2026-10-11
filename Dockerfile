@@ -2,7 +2,7 @@
 
 # ---- stage 1: build LibreDWG 0.13.4 (dwg2dxf) from source, statically linked ---------------
 FROM python:3.12-slim AS libredwg
-RUN apt-get update && apt-get install -y --no-install-recommends build-essential curl xz-utils ca-certificates \
+RUN apt-get update && apt-get install -y --no-install-recommends build-essential pkg-config curl xz-utils ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 RUN curl -fsSL https://ftp.gnu.org/gnu/libredwg/libredwg-0.13.4.tar.xz | tar -xJ -C /tmp \
     && cd /tmp/libredwg-0.13.4 \
