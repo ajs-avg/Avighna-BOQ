@@ -60,7 +60,7 @@ class Settings:
         # "auto" = pick the newest available model from the API at startup (see app/ai/gemini.py)
         self.gemini_model_fast: str = os.getenv("GEMINI_MODEL_FAST", "auto")
         self.gemini_model_pro: str = os.getenv("GEMINI_MODEL_PRO", "auto")
-        self.gemini_timeout_s: int = int(os.getenv("GEMINI_TIMEOUT_S", "180"))
+        self.gemini_timeout_s: int = int(os.getenv("GEMINI_TIMEOUT_S", "600"))  # pro reads of an A1 sheet can take minutes
         self.gemini_max_image_px: int = int(os.getenv("GEMINI_MAX_IMAGE_PX", "3000"))
         self.ai_enabled: bool = _bool(os.getenv("AI_ENABLED"), default=bool(self.gemini_api_key))
 

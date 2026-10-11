@@ -14,6 +14,24 @@ from app.models.schemas import (
 
 # ----------------------------------------------------------------------------- jobs
 def _headline(job: JobRecord) -> Tuple[int, Optional[float], Optional[float], str]:
+    if job.module == Module.measurement:
+        m = job.measurement
+        ex = job.elements
+        n = len(m.boq) if m else 0
+        if not m:
+            return (ex.count() if ex else 0), None, None, ""
+        t = m.totals_by_trade
+        bits = []
+        rcc = sum(v for k, d in t.items() if k == "RCC" for u, v in d.items() if u == "cum")
+        if rcc:
+            bits.append(f"{rcc:,.1f} cum RCC")
+        fl = sum(v for k, d in t.items() if k == "Flooring" for u, v in d.items() if u == "sqm")
+        if fl:
+            bits.append(f"{fl:,.0f} sqm floor")
+        pt = sum(v for k, d in t.items() if k == "Painting" for u, v in d.items() if u == "sqm")
+        if pt:
+            bits.append(f"{pt:,.0f} sqm paint")
+        return n, None, None, f"{n} BOQ items" + (" · " + " · ".join(bits) if bits else "")
     if job.module == Module.structural:
         n = len(job.members)
         tons = job.result.summary.grand_total_t if job.result else None
@@ -105,6 +123,8 @@ def job_stats() -> Dict[str, Any]:
             stats["steel_t"] += job.result.summary.grand_total_t
         if job.boq:
             stats["boq_lines"] += job.boq.summary.line_count
+        if job.measurement:
+            stats["boq_lines"] += len(job.measurement.boq)
     stats["steel_t"] = round(stats["steel_t"], 3)
     return stats
 

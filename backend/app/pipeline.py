@@ -15,27 +15,32 @@ from app import db, repository as repo
 from app.ai.gemini import GeminiClient, GeminiUnavailable
 from app.storage import get_storage
 from app.ai.mappers import (
-    classification_from_ai, fitout_from_ai, merge_fitout, merge_structural, structural_from_ai,
+    classification_from_ai, fitout_from_ai, measurement_from_ai, merge_fitout, merge_measurement,
+    merge_structural, structural_from_ai,
 )
 from app.ai.prompts import (
-    SYSTEM, AIFitoutExtraction, AISheetClass, AIStructuralExtraction, classify_prompt, fitout_prompt,
-    structural_prompt,
+    SYSTEM, AIFitoutExtraction, AIMeasurementExtraction, AISheetClass, AIStructuralExtraction, classify_prompt,
+    fitout_prompt, measurement_prompt, structural_prompt,
 )
 from app.config import get_settings
 from app.engine.bbs import compute_bbs
 from app.engine.boq import compute_boq
+from app.engine.measurement import compute_measurement
 from app.extract.detect import detect_format
 from app.extract.dwg_convert import ConversionError, convert_dwg_to_dxf
 from app.extract.dxf_reader import clear_cache, load_dxf, paperspace_hints, read_dxf, render_layout_png
 from app.sysinfo import dxf_too_large
 from app.extract.fitout_geometry import MeasuredFacts, measure_dxf, measure_from_inventory
-from app.extract.heuristics import classify_sheet_heuristic, fitout_items_from_facts, structural_members_heuristic
+from app.extract.heuristics import (
+    classify_sheet_heuristic, fitout_items_from_facts, measurement_from_facts, structural_members_heuristic,
+)
 from app.extract.image_reader import read_image, render_image_png
 from app.extract.inventory import SheetInventory
 from app.extract.pdf_reader import read_pdf, render_page_png, title_block_hints
 from app.extract.tables import reconstruct_tables, tables_to_prompt
 from app.models.schemas import (
-    FitoutExtraction, JobEvent, JobRecord, JobStatus, Module, SheetRecord, StructuralExtraction, new_id,
+    FitoutExtraction, JobEvent, JobRecord, JobStatus, MeasurementExtraction, Module, SheetRecord,
+    StructuralExtraction, new_id,
 )
 
 log = logging.getLogger(__name__)
@@ -81,6 +86,12 @@ class Pipeline:
 
     # ------------------------------------------------------------------ helpers
     @staticmethod
+    def _note(job: JobRecord, message: str) -> None:
+        """Visible job event (warning-style) without changing status or progress."""
+        job.events.append(JobEvent(at=datetime.utcnow(), status=job.status, message=message, progress=job.progress))
+        log.warning("job %s: %s", job.id, message)
+
+    @staticmethod
     def _event(job: JobRecord, status: JobStatus, message: str, progress: int) -> None:
         job.status = status
         job.progress = max(job.progress if status == job.status else 0, progress)
@@ -117,8 +128,10 @@ class Pipeline:
             self._event(job, JobStatus.extracting, "Reading members / items from relevant sheets", 45)
             if job.module == Module.structural:
                 self._extract_structural(job, sheets, ai)
-            else:
+            elif job.module == Module.fitout:
                 self._extract_fitout(job, sheets, sources, ai)
+            else:
+                self._extract_measurement(job, sheets, sources, ai)
             repo.save_sheets(job.id, [sh.record for sh in sheets])
 
             clear_cache()
@@ -135,6 +148,11 @@ class Pipeline:
 
     @staticmethod
     def _ready_message(job: JobRecord) -> str:
+        if job.module == Module.measurement and job.measurement:
+            m = job.measurement
+            ex = job.elements
+            n = ex.count() if ex else 0
+            return f"{len(m.boq)} BOQ items from {n} elements ({len(ex.rooms) if ex else 0} rooms)"
         if job.module == Module.structural and job.result:
             return f"{len(job.members)} members, {job.result.summary.grand_total_t:,.3f} t of steel"
         if job.boq:
@@ -230,7 +248,9 @@ class Pipeline:
                         png = render_page_png(path, inv.page_no, max_px=s.gemini_max_image_px, dpi=s.preview_dpi)
                     elif kind == "dxf":
                         clear_cache()   # the renderer is a separate process; don't hold a second copy here
-                        png = render_layout_png(path, inv.layout, max_px=s.gemini_max_image_px, dpi=s.preview_dpi)
+                        big = path.stat().st_size > 6_000_000
+                        png = render_layout_png(path, inv.layout, max_px=s.gemini_max_image_px, dpi=s.preview_dpi,
+                                                timeout_s=420 if big else 180)
                     else:
                         png = render_image_png(path, inv.page_no, max_px=s.gemini_max_image_px)
                     sh.hi_png = png
@@ -239,6 +259,7 @@ class Pipeline:
                     rec.preview_path = get_storage().store(pv, "previews", f"{job.id}/{rec.id}.png")
                 except Exception as exc:  # noqa: BLE001
                     rec.processing_notes.append(f"preview failed: {exc}")
+                    self._note(job, f"{rec.file_name}: preview could not be rendered ({str(exc)[:100]})")
                 sheets.append(sh)
         if not sheets:
             raise RuntimeError("No sheets could be read from the uploaded files")
@@ -249,13 +270,14 @@ class Pipeline:
         n = len(sheets)
         for i, sh in enumerate(sheets):
             heur = sh.record.classification
-            if ai.enabled and sh.hi_png:
+            if ai.enabled:
                 try:
                     res = ai.generate_json(
                         AISheetClass,
                         classify_prompt(sh.record.file_name, sh.record.page_no, sh.title_hints(),
                                         sh.inv.to_prompt_text(max_items=220)),
-                        images=[_downscale(sh.hi_png, 1600)], tier="fast", system=SYSTEM, max_output_tokens=2048,
+                        images=[_downscale(sh.hi_png, 1600)] if sh.hi_png else [], tier="fast", system=SYSTEM,
+                        max_output_tokens=2048,
                     )
                     cls = classification_from_ai(res)
                     # keep the deterministic unit guess when the model is unsure
@@ -411,9 +433,75 @@ class Pipeline:
             job.events.append(JobEvent(at=datetime.utcnow(), status=JobStatus.extracting, message=w, progress=job.progress))
 
 
+    # ------------------------------------------------------------------ stage 4c: measurement (the product)
+    def _extract_measurement(self, job: JobRecord, sheets: List[_Sheet], sources: List[Tuple[str, str, Path]],
+                             ai: GeminiClient) -> None:
+        dxf_by_stem: Dict[str, Path] = {p.stem.lower(): p for (_n, k, p) in sources if k == "dxf"}
+        for sh in sheets:  # CAD facts (rooms with area/perimeter, tag counts) feed the model
+            try:
+                if sh.kind == "dxf" and sh.record.layout == "Model":
+                    sh.facts = measure_dxf(sh.path, sh.inv)
+                else:
+                    sh.facts = measure_from_inventory(sh.inv)
+            except Exception as exc:  # noqa: BLE001
+                sh.record.processing_notes.append(f"geometry measurement failed: {exc}")
+                sh.facts = MeasuredFacts(source=sh.label)
+        skip_types = {"title_or_index", "perspective", "general_notes"}
+        relevant = [sh for sh in sheets if sh.record.classification.sheet_type not in skip_types and (sh.inv.texts or (sh.facts and not sh.facts.is_empty()))]
+        if not relevant:
+            relevant = [sh for sh in sheets if sh.inv.texts]
+        parts: List[MeasurementExtraction] = []
+        known = ""
+        n = len(relevant)
+        for i, sh in enumerate(relevant):
+            c = sh.record.classification
+            part: Optional[MeasurementExtraction] = None
+            facts_txt = sh.facts.to_prompt_text() if sh.facts else "(none)"
+            if ai.enabled:
+                if not sh.hi_png:  # preview failed: still read from the machine text + CAD facts
+                    self._note(job, f"{sh.label}: no preview image, AI reads the vector text and CAD facts only")
+                try:
+                    res = ai.generate_json(
+                        AIMeasurementExtraction,
+                        measurement_prompt(sh.label, c.sheet_type, c.units, facts_txt, sh.inv.to_prompt_text(), known),
+                        images=[sh.hi_png] if sh.hi_png else [], tier="pro", system=SYSTEM,
+                        max_output_tokens=65536, temperature=0.05,
+                    )
+                    part = measurement_from_ai(res, sh.label)
+                    a = part.assumptions
+                    known = f"floor height {a.floor_height_m} m, wall {a.wall_thickness_m} m, slab {a.slab_thickness_m} m, {a.construction}, {a.concrete_grade}"
+                except (GeminiUnavailable, Exception) as exc:  # noqa: BLE001
+                    sh.record.processing_notes.append(f"AI reading failed on this sheet, geometry fallback used: {exc}")
+                    self._note(job, f"{sh.label}: AI reading failed ({str(exc)[:120]}); rooms taken from CAD outlines only")
+            if part is None:
+                part = measurement_from_facts(sh.facts or MeasuredFacts(source=sh.label), sh.label)
+                if not ai.enabled:
+                    part.warnings.append("AI reading is off: rooms from CAD outlines only; sizes shown as equivalent squares")
+                else:
+                    part.warnings.append(f"{sh.label}: AI reading failed, rooms from CAD outlines only (equivalent squares)")
+            sh.record.measurement_extraction = part
+            parts.append(part)
+            self._event(job, JobStatus.extracting,
+                        f"{sh.label}: {len(part.rooms)} rooms, {len(part.openings)} openings, {len(part.walls)} walls, {len(part.misc)} other items",
+                        45 + int(40 * (i + 1) / max(n, 1)))
+        merged = merge_measurement(parts)
+        job.elements = merged
+        for w in merged.warnings[:20]:
+            job.events.append(JobEvent(at=datetime.utcnow(), status=JobStatus.extracting, message=w, progress=job.progress))
+        if merged.count() == 0:
+            job.events.append(JobEvent(at=datetime.utcnow(), status=JobStatus.extracting,
+                                       message="No rooms or elements were read. Check the drawing or add elements manually.", progress=job.progress))
+
+
 # ---------------------------------------------------------------------- shared
 def recalculate(job: JobRecord) -> JobRecord:
     """Deterministic quantification; also invalidates any cached export."""
+    if job.module == Module.measurement:
+        from app.models.schemas import MeasurementExtraction as _ME
+        job.measurement = compute_measurement(job.elements or _ME())
+        job.result, job.boq = None, None
+        job.export_path = None
+        return job
     if job.module == Module.structural:
         job.result = compute_bbs(job.members, job.standards, job.level)
         job.boq = None

@@ -1,4 +1,4 @@
-import type { JobStatus, MemberKind, Module, QtyBasis, Role } from "./types";
+import type { BOQBasis, JobStatus, MemberKind, Module, QtyBasis, Role } from "./types";
 
 export const APP_NAME = "Avighna BOQ";
 export const TAGLINE = "Drop a drawing, get a measurement sheet.";
@@ -51,6 +51,13 @@ export const MODULE_META: Record<
   Module,
   { label: string; short: string; description: string; output: string; unit: string }
 > = {
+  measurement: {
+    label: "Measurement",
+    short: "Measurement",
+    description: "Drawing → measurement sheet (IS 1200), BOQ abstract and material requirement.",
+    output: "Measurement",
+    unit: "cum / sqm / rmt / nos",
+  },
   structural: {
     label: "Structural — Reinforcement BBS",
     short: "Structural",
@@ -92,9 +99,19 @@ export const BASIS_META: Record<QtyBasis, { label: string; tone: Tone; hint: str
   manual: { label: "Manual", tone: "neutral", hint: "Entered or edited by a reviewer" },
 };
 
+/** Basis of a BOQ abstract line (measurement module). */
+export const BOQ_BASIS_META: Record<BOQBasis, { label: string; tone: Tone; hint: string }> = {
+  measured: { label: "Measured", tone: "success", hint: "Measured from the elements per IS 1200" },
+  thumb_rule: { label: "Thumb rule", tone: "warning", hint: "Thumb rule — replace with bar bending schedule" },
+  manual: { label: "Manual", tone: "neutral", hint: "Entered by a reviewer" },
+};
+
 export const CURRENCIES = ["AED", "INR", "USD"] as const;
 
 export const DEFAULTS = {
+  measurement: {
+    project_name: "Nishika Elysium (Avighna)",
+  },
   structural: {
     project_name: "Nishika Elysium (Avighna)",
     contractor: "Mehta Jaising Builders LLP",

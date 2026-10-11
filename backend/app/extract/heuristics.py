@@ -245,3 +245,34 @@ def structural_members_heuristic(inv: SheetInventory, sheet_label: str, floor_he
     if not out.beams and not out.columns:
         out.warnings.append(f"{sheet_label}: no members recognised without AI reading")
     return out
+
+
+def measurement_from_facts(facts: MeasuredFacts, sheet_label: str) -> "MeasurementExtraction":
+    """No-AI fallback for the measurement module: rooms from CAD room polygons (area + perimeter),
+    doors/windows from tag counts. Dimensions default to a square of the same area."""
+    import math
+    from app.models.schemas import MeasurementExtraction, OpeningEl, RoomEl
+    out = MeasurementExtraction()
+    for r in facts.rooms:
+        if r.name.startswith("(") or r.area_m2 <= 0:
+            continue
+        side = math.sqrt(r.area_m2)
+        name = r.name.title()
+        wet = bool(re.search(r"toilet|bath|wc|kitchen|utility|pantry|wash|balcony", name, re.I))
+        out.rooms.append(RoomEl(name=name, length_m=round(side, 3), width_m=round(side, 3), area_m2=r.area_m2, perimeter_m=r.perimeter_m,
+                                wet_area=wet, dado_height_m=2.1 if wet and "balcony" not in name.lower() else 0,
+                                confidence=0.5, evidence=[f"closed outline on layer {r.layer}: {r.area_m2} m2, perimeter {r.perimeter_m} m"],
+                                source_sheet=sheet_label, remarks="size from CAD outline; L x B shown as equivalent square"))
+    for txt, n in list(facts.attrib_counts.items()) + list(facts.code_counts.items()):
+        m = re.match(r"^(D|DR|W|WN|V)[- ]?(\d{1,2}[A-Z]?)$", txt.strip().upper())
+        if not m:
+            continue
+        kind = "door" if m.group(1) in ("D", "DR") else ("ventilator" if m.group(1) == "V" else "window")
+        if any(o.tag == txt.upper() for o in out.openings):
+            continue
+        w, h = (1.0, 2.1) if kind == "door" else ((0.6, 0.45) if kind == "ventilator" else (1.5, 1.2))
+        out.openings.append(OpeningEl(tag=txt.upper(), kind=kind, width_m=w, height_m=h, count=n, confidence=0.3,
+                                      evidence=[f"{n} x '{txt}' tag(s) on sheet; size assumed, check schedule"], source_sheet=sheet_label))
+    if not out.rooms and not out.openings:
+        out.warnings.append(f"{sheet_label}: nothing measurable without AI reading")
+    return out

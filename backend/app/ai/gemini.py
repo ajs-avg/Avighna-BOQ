@@ -47,7 +47,10 @@ class GeminiClient:
             return
         try:
             from google import genai  # type: ignore
-            self._client = genai.Client(api_key=s.gemini_api_key)
+            from google.genai import types as _gt  # type: ignore
+            # Hard HTTP timeout: a hung request must fail (and fall back) instead of blocking a worker forever.
+            self._client = genai.Client(api_key=s.gemini_api_key,
+                                        http_options=_gt.HttpOptions(timeout=int(s.gemini_timeout_s * 1000)))
             self._resolve_models(s.gemini_model_fast, s.gemini_model_pro)
             self.message = f"Gemini ready (fast={self.model_fast}, pro={self.model_pro})"
         except Exception as exc:  # pragma: no cover - network

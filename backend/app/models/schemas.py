@@ -248,8 +248,9 @@ class StructuralExtraction(BaseModel):
 # Product modules
 # --------------------------------------------------------------------------- #
 class Module(str, Enum):
-    structural = "structural"   # RCC reinforcement -> Bar Bending Schedule (tons)
-    fitout = "fitout"           # Interior fit-out -> Bill of Quantities (m2 / lm / nos)
+    measurement = "measurement" # THE product: drawing -> measurement sheet -> BOQ -> materials
+    structural = "structural"   # (legacy) RCC reinforcement -> Bar Bending Schedule (tons)
+    fitout = "fitout"           # (legacy) Interior fit-out -> KR-style Bill of Quantities
 
 
 # --------------------------------------------------------------------------- #
@@ -458,6 +459,7 @@ class SheetRecord(BaseModel):
     height: float = 0
     extraction: Optional[StructuralExtraction] = None
     fitout_extraction: Optional[FitoutExtraction] = None
+    measurement_extraction: Optional["MeasurementExtraction"] = None
     processing_notes: List[str] = Field(default_factory=list)
 
 
@@ -470,10 +472,10 @@ class JobEvent(BaseModel):
 
 class JobRecord(BaseModel):
     id: str
-    module: Module = Module.structural
+    module: Module = Module.measurement
     project_name: str
     level: str
-    currency: str = Field("INR", description="Currency label for BOQ amounts (fit-out module)")
+    currency: str = Field("INR", description="Currency label for BOQ amounts")
     location: Optional[str] = None
     contractor: Optional[str] = None
     work_description: str = "Reinforcement For RCC Work Including Cutting, Bending, Placing In Position & Binding"
@@ -490,6 +492,8 @@ class JobRecord(BaseModel):
     rooms: List[RoomRecord] = Field(default_factory=list)
     legend: Dict[str, str] = Field(default_factory=dict)
     boq: Optional[BOQResult] = None
+    elements: Optional["MeasurementExtraction"] = None
+    measurement: Optional["MeasurementResult"] = None
     general_notes: GeneralNotes = Field(default_factory=GeneralNotes)
     sheet_count: int = 0
     events: List[JobEvent] = Field(default_factory=list)
@@ -506,7 +510,7 @@ class JobRecord(BaseModel):
 class JobSummaryRecord(BaseModel):
     """Light version for lists."""
     id: str
-    module: Module = Module.structural
+    module: Module = Module.measurement
     project_name: str
     level: str
     status: JobStatus
@@ -588,3 +592,198 @@ class RoleUpdate(BaseModel):
     role: Optional[Literal["engineer", "reviewer", "admin"]] = None
     is_active: Optional[bool] = None
     full_name: Optional[str] = None
+
+
+# =========================================================================== #
+# MEASUREMENT module (the product): drawing -> elements -> measurement sheet
+# -> BOQ abstract -> material requirement. Lengths in metres.
+# =========================================================================== #
+WallType = Literal["rcc", "block", "partition", "glass", "other"]
+OpeningKind = Literal["door", "window", "opening", "ventilator"]
+
+
+class RoomEl(BaseModel):
+    id: str = Field(default_factory=new_id)
+    name: str = Field(description="Room / space name e.g. Bedroom 1, Living, Toilet 2")
+    level: str = Field("", description="Floor / level e.g. 6th floor")
+    length_m: float = Field(gt=0, description="Internal clear length")
+    width_m: float = Field(gt=0, description="Internal clear width")
+    height_m: float = Field(3.0, gt=0, description="Floor to ceiling height")
+    area_m2: Optional[float] = Field(None, description="Measured area when the room is not rectangular")
+    perimeter_m: Optional[float] = Field(None, description="Measured perimeter when not rectangular")
+    floor_finish: str = Field("Vitrified tile flooring 600x600", description="Floor finish description / code")
+    wall_finish: str = Field("Putty + primer + emulsion", description="Wall finish (paint / tiles / wallpaper)")
+    ceiling_finish: str = Field("Putty + primer + emulsion", description="Ceiling finish")
+    skirting_mm: float = Field(100, ge=0, description="Skirting height, 0 = none")
+    dado_height_m: float = Field(0, ge=0, description="Wall tile (dado) height, 0 = none")
+    wet_area: bool = Field(False, description="Bathroom / kitchen / utility -> waterproofing")
+    plastered: bool = Field(True, description="Walls need plaster (False for Mivan RCC walls: putty only)")
+    confidence: float = 0.5
+    evidence: List[str] = Field(default_factory=list)
+    source_sheet: Optional[str] = None
+    remarks: Optional[str] = None
+
+
+class OpeningEl(BaseModel):
+    id: str = Field(default_factory=new_id)
+    tag: str = Field(description="D1, W2, V1 ...")
+    kind: OpeningKind = "door"
+    width_m: float = Field(gt=0)
+    height_m: float = Field(gt=0)
+    count: int = Field(1, ge=1)
+    room: str = Field("", description="Room the opening belongs to")
+    wall_tag: str = Field("", description="Wall it sits in, if known")
+    description: str = Field("", description="e.g. Flush door 35 mm with frame & hardware")
+    level: str = ""
+    confidence: float = 0.5
+    evidence: List[str] = Field(default_factory=list)
+    source_sheet: Optional[str] = None
+
+
+class WallEl(BaseModel):
+    id: str = Field(default_factory=new_id)
+    tag: str = Field(description="W1, W2 ...")
+    wall_type: WallType = "block"
+    length_m: float = Field(gt=0)
+    thickness_m: float = Field(gt=0)
+    height_m: float = Field(gt=0)
+    count: int = Field(1, ge=1)
+    room: str = ""
+    level: str = ""
+    both_faces: bool = Field(True, description="Formwork / finish on both faces")
+    confidence: float = 0.5
+    evidence: List[str] = Field(default_factory=list)
+    source_sheet: Optional[str] = None
+
+
+class SlabEl(BaseModel):
+    id: str = Field(default_factory=new_id)
+    tag: str = "S1"
+    length_m: float = Field(gt=0)
+    width_m: float = Field(gt=0)
+    thickness_m: float = Field(0.15, gt=0)
+    count: int = Field(1, ge=1)
+    level: str = ""
+    beam_width_m: float = Field(0.23, ge=0, description="Beam width to subtract from soffit formwork")
+    confidence: float = 0.5
+    evidence: List[str] = Field(default_factory=list)
+    source_sheet: Optional[str] = None
+
+
+class MemberEl(BaseModel):
+    """Column or beam."""
+    id: str = Field(default_factory=new_id)
+    tag: str
+    kind: Literal["column", "beam"] = "column"
+    width_m: float = Field(gt=0)
+    depth_m: float = Field(gt=0)
+    length_m: float = Field(gt=0, description="Height for columns, clear span for beams")
+    count: int = Field(1, ge=1)
+    level: str = ""
+    slab_thickness_m: float = Field(0, ge=0, description="Beams: slab thickness included in depth (measured below slab)")
+    confidence: float = 0.5
+    evidence: List[str] = Field(default_factory=list)
+    source_sheet: Optional[str] = None
+
+
+class MiscEl(BaseModel):
+    """Anything countable that is not a room/wall/opening: fixtures, joinery, lights, sanitary ware..."""
+    id: str = Field(default_factory=new_id)
+    tag: Optional[str] = None
+    description: str
+    unit: Literal["nos", "sqm", "rmt", "cum", "kg", "LS"] = "nos"
+    qty: float = Field(gt=0)
+    trade: str = Field("Miscellaneous", description="Plumbing / Electrical / Joinery / Sanitary / Other")
+    room: str = ""
+    level: str = ""
+    confidence: float = 0.5
+    evidence: List[str] = Field(default_factory=list)
+    source_sheet: Optional[str] = None
+
+
+class ProjectAssumptions(BaseModel):
+    floor_height_m: float = 3.0
+    wall_thickness_m: float = 0.2
+    slab_thickness_m: float = 0.15
+    construction: Literal["mivan", "conventional"] = "conventional"
+    concrete_grade: str = "M40"
+    notes: List[str] = Field(default_factory=list)
+
+
+class MeasurementExtraction(BaseModel):
+    rooms: List[RoomEl] = Field(default_factory=list)
+    openings: List[OpeningEl] = Field(default_factory=list)
+    walls: List[WallEl] = Field(default_factory=list)
+    slabs: List[SlabEl] = Field(default_factory=list)
+    members: List[MemberEl] = Field(default_factory=list)
+    misc: List[MiscEl] = Field(default_factory=list)
+    assumptions: ProjectAssumptions = Field(default_factory=ProjectAssumptions)
+    warnings: List[str] = Field(default_factory=list)
+
+    def count(self) -> int:
+        return len(self.rooms) + len(self.openings) + len(self.walls) + len(self.slabs) + len(self.members) + len(self.misc)
+
+
+# ---- results
+class MeasurementRow(BaseModel):
+    sr: int
+    location: str = Field(description="What & where: 'Wall W1 (outer), Bedroom 1, 6th floor'")
+    nos: float = 1
+    l_m: Optional[float] = None
+    b_m: Optional[float] = None
+    h_m: Optional[float] = None
+    qty: float
+    deduction: bool = False
+    rule: str = Field("", description="IS 1200 rule / drawing reference")
+    element_id: Optional[str] = None
+
+
+class MeasurementBlock(BaseModel):
+    item_code: str
+    item_title: str
+    unit: str
+    trade: str
+    rows: List[MeasurementRow]
+    total: float
+
+
+class BOQAbstractLine(BaseModel):
+    item_no: int
+    item_code: str
+    trade: str
+    description: str
+    unit: str
+    qty: float
+    rate: Optional[float] = None
+    amount: Optional[float] = None
+    basis: Literal["measured", "thumb_rule", "manual"] = "measured"
+
+
+class MaterialRow(BaseModel):
+    material: str
+    for_item_code: str
+    boq_qty: float
+    boq_unit: str
+    norm: float
+    norm_unit: str
+    wastage_pct: float
+    required: float
+    basis: str = ""
+
+
+class MeasurementResult(BaseModel):
+    blocks: List[MeasurementBlock]
+    boq: List[BOQAbstractLine]
+    materials: List[MaterialRow]
+    totals_by_trade: Dict[str, Dict[str, float]] = Field(default_factory=dict)
+    warnings: List[str] = Field(default_factory=list)
+
+
+class ElementsUpdate(BaseModel):
+    """Whole element set after reviewer edits (PUT /jobs/{id}/elements)."""
+    elements: MeasurementExtraction
+
+
+JobRecord.model_rebuild()
+SheetRecord.model_rebuild()
+ElementsUpdate.model_rebuild()

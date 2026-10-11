@@ -18,11 +18,15 @@ def render(path: Path, layout_name: str, max_px: int, dpi: int) -> bytes:
     from ezdxf.addons.drawing import layout as dlayout
     from ezdxf.addons.drawing import pymupdf as pymupdf_backend
 
-    try:
-        doc = ezdxf.readfile(str(path))
+    try:  # one loader for the whole app: recover mode + LibreDWG layer-colour fix
+        from app.extract.dwg_convert import load_dxf_lenient
+        doc = load_dxf_lenient(path)
     except Exception:
-        from ezdxf import recover
-        doc, _ = recover.readfile(str(path))
+        try:
+            doc = ezdxf.readfile(str(path))
+        except Exception:
+            from ezdxf import recover
+            doc, _ = recover.readfile(str(path))
     try:
         doc.audit()
     except Exception:
@@ -38,11 +42,14 @@ def render(path: Path, layout_name: str, max_px: int, dpi: int) -> bytes:
         ctx.current_layout_properties.set_colors("#FFFFFF")
     except Exception:
         pass
+    # Heavy files (DWG-converted elevation sheets with thousands of coded hatches) must still render
+    # inside the pipeline's time budget: coarser flattening and no hatch boundaries beyond a threshold.
+    heavy = path.stat().st_size > 6_000_000 or len(layout) > 15_000
     cfg = Configuration().with_changes(
-        hatch_policy=HatchPolicy.SHOW_OUTLINE,          # pattern fills would explode into millions of lines
+        hatch_policy=HatchPolicy.IGNORE if heavy else HatchPolicy.SHOW_OUTLINE,  # fills would explode into millions of lines
         lineweight_policy=LineweightPolicy.RELATIVE,
         min_lineweight=0.15,
-        max_flattening_distance=0.5,
+        max_flattening_distance=2.0 if heavy else 0.5,
         background_policy=BackgroundPolicy.WHITE,       # plot-style black on white (draw_layout resets layout colors)
         color_policy=ColorPolicy.BLACK,
     )

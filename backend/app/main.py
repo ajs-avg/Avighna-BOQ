@@ -13,7 +13,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from fastapi import Depends, FastAPI, File, Form, HTTPException, Query, Request, UploadFile, status
+from fastapi import Body, Depends, FastAPI, File, Form, HTTPException, Query, Request, UploadFile, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse, Response
 from pydantic import BaseModel, Field, TypeAdapter, ValidationError
@@ -26,8 +26,8 @@ from app.config import get_settings
 from app.extract.dwg_convert import converter_status
 from app.models.schemas import (
     AIStatus, CreateJobResponse, FitoutItem, InviteRequest, InviteResponse, ItemUpdate, JobEvent, JobRecord,
-    JobStatus, LoginRequest, MemberSpec, MemberUpdate, Module, RoleUpdate, SetPasswordRequest, SheetRecord,
-    SourceFile, Standards, TokenResponse, UserProfile, new_id,
+    ElementsUpdate, JobStatus, LoginRequest, MeasurementExtraction, MemberSpec, MemberUpdate, Module, RoleUpdate,
+    SetPasswordRequest, SheetRecord, SourceFile, Standards, TokenResponse, UserProfile, new_id,
 )
 from app.pipeline import Pipeline, recalculate
 
@@ -234,7 +234,7 @@ def _event(job: JobRecord, st: JobStatus, message: str, progress: Optional[int] 
 @app.post("/api/v1/jobs", response_model=CreateJobResponse, status_code=status.HTTP_202_ACCEPTED)
 async def create_job(
     files: List[UploadFile] = File(...),
-    module: str = Form("structural"),
+    module: str = Form("measurement"),
     project_name: str = Form(...),
     level: str = Form(""),
     contractor: Optional[str] = Form(None),
@@ -248,7 +248,7 @@ async def create_job(
     try:
         mod = Module(module)
     except ValueError:
-        raise HTTPException(status.HTTP_400_BAD_REQUEST, "module must be 'structural' or 'fitout'")
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "module must be 'measurement', 'structural' or 'fitout'")
     files = [f for f in files if f.filename]
     if not files:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "Upload at least one drawing file")
@@ -266,6 +266,8 @@ async def create_job(
                     standards=std, created_by=user.id, created_by_email=user.email)
     if mod == Module.fitout:
         job.work_description = "Interior fit-out works: supply and installation complete as per drawings and specifications"
+    elif mod == Module.measurement:
+        job.work_description = "Measurement sheet, BOQ abstract and material requirement from drawings (IS 1200)"
     updir = s.data_dir / "uploads" / job.id
     updir.mkdir(parents=True, exist_ok=True)
     limit = s.max_upload_mb * 1024 * 1024
@@ -308,8 +310,8 @@ async def create_job(
 def list_jobs(limit: int = Query(50, ge=1, le=200), offset: int = Query(0, ge=0),
               module: Optional[str] = None, status_: Optional[str] = Query(None, alias="status"),
               _: UserProfile = Depends(auth.current_user)) -> Dict[str, Any]:
-    if module and module not in ("structural", "fitout"):
-        raise HTTPException(status.HTTP_400_BAD_REQUEST, "module must be 'structural' or 'fitout'")
+    if module and module not in ("measurement", "structural", "fitout"):
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "module must be 'measurement', 'structural' or 'fitout'")
     if status_ and status_ not in {s.value for s in JobStatus}:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "unknown status")
     items, total = repo.list_jobs(limit, offset, module, status_)
@@ -474,6 +476,24 @@ def delete_item(job_id: str, item_id: str, user: UserProfile = Depends(auth.curr
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Item not found")
     db.audit("item.delete", user.email, job.id, gone[0] if gone else item_id)
     return _recalc_and_save(job, user, f"item {gone[0] if gone else ''} deleted")
+
+
+@app.put("/api/v1/jobs/{job_id}/elements", response_model=JobRecord)
+def put_elements(job_id: str, body: ElementsUpdate = Body(...), user: UserProfile = Depends(auth.current_user)) -> JobRecord:
+    """Replace the elements read from the drawings (rooms, openings, walls, slabs, members, misc items)
+    after the reviewer edited them; the measurement sheet, BOQ and materials are recomputed."""
+    job = _load_job(job_id)
+    _require_editable(job)
+    if job.module != Module.measurement:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Elements belong to measurement jobs")
+    ex = body.elements
+    for lst in (ex.rooms, ex.openings, ex.walls, ex.slabs, ex.members, ex.misc):
+        for e in lst:
+            if e.confidence < 1.0 and not any(v.startswith("edited by") for v in e.evidence):
+                continue
+    job.elements = ex
+    db.audit("elements.update", user.email, job.id, f"{ex.count()} elements")
+    return _recalc_and_save(job, user, "elements edited")
 
 
 class RecalcRequest(BaseModel):

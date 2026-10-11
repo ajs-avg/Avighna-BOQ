@@ -74,7 +74,9 @@ export function SheetsTab({ jobId, module, refreshKey }: { jobId: string; module
 
 function SheetCard({ sheet, module }: { sheet: SheetRecord; module: Module }) {
   const c = sheet.classification;
+  // Measurement sheets are quantity take-offs, so they share the BOQ relevance flag.
   const relevant = module === "structural" ? c.relevant_for_bbs : c.relevant_for_boq;
+  const relevantLabel = module === "structural" ? "BBS relevant" : module === "fitout" ? "BOQ relevant" : "Measured";
   return (
     <article className="card flex flex-col overflow-hidden">
       <SheetPreview jobId={sheet.job_id} sheetId={sheet.id} hasPreview={!!sheet.preview_path} alt={`${sheet.file_name} page ${sheet.page_no}`} />
@@ -90,7 +92,7 @@ function SheetCard({ sheet, module }: { sheet: SheetRecord; module: Module }) {
             </p>
           </div>
           <Badge tone={relevant ? "success" : "neutral"} size="xs">
-            {relevant ? (module === "structural" ? "BBS relevant" : "BOQ relevant") : "Not used"}
+            {relevant ? relevantLabel : "Not used"}
           </Badge>
         </div>
 

@@ -5,8 +5,8 @@ import { TAGLINE } from "@/lib/constants";
 
 const POINTS = [
   "Drop DWG, DXF, PDF or scanned drawings — several at once.",
-  "Structural drawings become a bar bending schedule in tons.",
-  "Interior fit-out drawings become a BOQ in m², lm and nos.",
+  "AI + engine read the rooms, openings, walls, slabs and members.",
+  "Measurement sheet (IS 1200), BOQ abstract and material requirement.",
   "Review, correct, approve and download the Excel sheet.",
 ];
 

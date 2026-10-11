@@ -11,6 +11,7 @@ import type {
   JobRecord,
   JobStatus,
   LoginRequest,
+  MeasurementExtraction,
   MemberSpec,
   Module,
   RejectRequest,
@@ -297,6 +298,16 @@ export const deleteItem = (jobId: string, itemId: string) =>
     method: "DELETE",
   });
 
+// measurement elements
+/**
+ * Replace the WHOLE element set read from the drawings (rooms, openings, walls, slabs,
+ * members, misc + assumptions). The API recomputes the measurement sheet, BOQ and
+ * materials and returns the refreshed job. Allowed when ready / approved / failed;
+ * an edit on an approved job clears the approval.
+ */
+export const putElements = (jobId: string, elements: MeasurementExtraction) =>
+  apiFetch<JobRecord>(`/api/v1/jobs/${encodeURIComponent(jobId)}/elements`, { method: "PUT", body: { elements } });
+
 // lifecycle
 export const recalculate = (jobId: string, body: { standards?: Standards; currency?: string } = {}) =>
   apiFetch<JobRecord>(`/api/v1/jobs/${encodeURIComponent(jobId)}/recalculate`, { method: "POST", body });
@@ -313,12 +324,15 @@ export const rejectJob = (jobId: string, reason: string) => {
   return apiFetch<JobRecord>(`/api/v1/jobs/${encodeURIComponent(jobId)}/reject`, { method: "POST", body });
 };
 
-/** Download the Excel export as a Blob (caller triggers the save). */
-export async function downloadExport(jobId: string): Promise<Blob> {
+/**
+ * Download the Excel export as a Blob (caller triggers the save). The file name comes from
+ * the server's `Content-Disposition` header, falling back to `fallbackFilename`.
+ */
+export async function downloadExport(jobId: string, fallbackFilename = "measurement.xlsx"): Promise<BlobDownload> {
   const res = await apiRequest(`/api/v1/jobs/${encodeURIComponent(jobId)}/export.xlsx`, {
     headers: { Accept: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,*/*" },
   });
-  return res.blob();
+  return { blob: await res.blob(), filename: filenameFromDisposition(res, fallbackFilename) };
 }
 
 // ---- standards -------------------------------------------------------------

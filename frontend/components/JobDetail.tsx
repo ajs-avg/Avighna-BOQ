@@ -20,7 +20,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { approve, downloadExport, getJob, isApiError, recalculate, reprocess } from "@/lib/api";
 import { MEMBER_KINDS, MEMBER_KIND_META, MODULE_META, PIPELINE_STEPS, POLL_INTERVAL_MS, STATUS_META, isProcessing } from "@/lib/constants";
-import { formatBytes, formatDate, formatInt, formatRelative, formatTons } from "@/lib/format";
+import { formatBytes, formatDate, formatInt, formatM, formatRelative, formatTons } from "@/lib/format";
 import type { Division, JobRecord, MemberKind, SourceFormat } from "@/lib/types";
 import { useUser } from "@/lib/user-context";
 import { cn, downloadBlob, errorMessage, slugify } from "@/lib/utils";
@@ -33,6 +33,11 @@ import { Timeline } from "./Timeline";
 import { BOQSummaryCards } from "./fitout/BOQSummaryCards";
 import { BOQTab } from "./fitout/BOQTab";
 import { RoomsTable } from "./fitout/RoomsTable";
+import { ElementsTab } from "./measurement/ElementsTab";
+import { MaterialsTab } from "./measurement/MaterialsTab";
+import { MeasurementBOQTab } from "./measurement/MeasurementBOQTab";
+import { MeasurementSheetTab } from "./measurement/MeasurementSheetTab";
+import { countElements, lowConfidenceCount } from "./measurement/elementForms";
 import { MemberTab } from "./structural/MemberTab";
 import { SummaryTable } from "./structural/SummaryTable";
 import { Alert } from "./ui/Alert";
@@ -48,7 +53,7 @@ import { StatusPill } from "./ui/StatusPill";
 import { Tabs, type TabItem } from "./ui/Tabs";
 import { useToast } from "./ui/Toast";
 
-type TabKey = "summary" | MemberKind | "sheets" | "boq" | "rooms";
+type TabKey = "summary" | MemberKind | "sheets" | "boq" | "rooms" | "measure" | "materials" | "elements";
 type Action = "reprocess" | "recalculate" | "approve" | "download";
 
 export function JobDetail({ id }: { id: string }) {
@@ -59,10 +64,12 @@ export function JobDetail({ id }: { id: string }) {
   const [job, setJob] = useState<JobRecord | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [notFound, setNotFound] = useState(false);
-  const [tab, setTab] = useState<TabKey>("summary");
+  // null until the user picks one: the default depends on the module, which we only know once the job loads.
+  const [tabChoice, setTabChoice] = useState<TabKey | null>(null);
   const [acting, setActing] = useState<Action | null>(null);
   const [focusDivision, setFocusDivision] = useState<Division | null>(null);
   const [sendBackOpen, setSendBackOpen] = useState(false);
+  const [elementsDirty, setElementsDirty] = useState(false);
   const prevStatus = useRef<JobRecord["status"] | null>(null);
 
   const load = useCallback(async () => {
@@ -122,7 +129,10 @@ export function JobDetail({ id }: { id: string }) {
     if (!job) return;
     const ok = await confirm({
       title: "Reprocess this job?",
-      message: "The whole pipeline runs again from the uploaded drawings. Manual edits to members or items will be overwritten.",
+      message:
+        job.module === "measurement"
+          ? "The drawings are read again from scratch. Every element you corrected or added will be overwritten."
+          : "The whole pipeline runs again from the uploaded drawings. Manual edits to members or items will be overwritten.",
       confirmLabel: "Reprocess",
       danger: true,
     });
@@ -163,9 +173,10 @@ export function JobDetail({ id }: { id: string }) {
   const onDownload = () =>
     job &&
     run("download", async () => {
-      const blob = await downloadExport(job.id);
-      downloadBlob(blob, `${slugify(job.project_name)}-${slugify(job.level)}-${job.module}.xlsx`);
-      toast.success("Excel downloaded");
+      // The server names the file (Content-Disposition); the slug is only a fallback.
+      const { blob, filename } = await downloadExport(job.id, `${slugify(job.project_name)}-${slugify(job.level)}-${job.module}.xlsx`);
+      downloadBlob(blob, filename);
+      toast.success("Excel downloaded", filename);
     });
 
   if (notFound) {
@@ -196,11 +207,23 @@ export function JobDetail({ id }: { id: string }) {
   }
 
   const canDownload = job.status === "ready" || job.status === "approved";
+  // Edits are accepted only when the job is settled (ready / failed); approved is locked
+  // until a reviewer sends it back, so quantities never drift under an approval.
   const readOnly = processing || job.status === "approved";
+  const isMeasurement = job.module === "measurement";
   const moduleMeta = MODULE_META[job.module];
+  const tab: TabKey = tabChoice ?? (isMeasurement ? "measure" : "summary");
+  const setTab = (k: TabKey) => setTabChoice(k);
 
-  const tabs: TabItem<TabKey>[] =
-    job.module === "structural"
+  const tabs: TabItem<TabKey>[] = isMeasurement
+    ? [
+        { key: "measure", label: "Measurement Sheet", count: job.measurement?.blocks.length ?? 0 },
+        { key: "boq", label: "BOQ", count: job.measurement?.boq.length ?? 0 },
+        { key: "materials", label: "Materials", count: job.measurement?.materials.length ?? 0 },
+        { key: "elements", label: "Elements", count: countElements(job.elements) },
+        { key: "sheets", label: "Sheets", count: job.sheet_count },
+      ]
+    : job.module === "structural"
       ? [
           { key: "summary", label: "Summary" },
           ...MEMBER_KINDS.map<TabItem<TabKey>>((k) => ({ key: k, label: MEMBER_KIND_META[k].plural, count: job.members.filter((m) => m.kind === k).length })),
@@ -213,8 +236,20 @@ export function JobDetail({ id }: { id: string }) {
           { key: "sheets", label: "Sheets", count: job.sheet_count },
         ];
 
-  const lowConfidence =
-    job.module === "structural" ? job.members.filter((m) => m.confidence < 0.6).length : job.fitout_items.filter((i) => i.confidence < 0.6).length;
+  const lowConfidence = isMeasurement
+    ? lowConfidenceCount(job.elements)
+    : job.module === "structural"
+      ? job.members.filter((m) => m.confidence < 0.6).length
+      : job.fitout_items.filter((i) => i.confidence < 0.6).length;
+  const lowConfidenceNoun = isMeasurement ? "element" : job.module === "structural" ? "member" : "item";
+
+  const readOnlyReason = processing
+    ? "Editing is locked while the drawings are being processed."
+    : job.status === "approved"
+      ? canSendBack
+        ? "Approved — send the job back to reopen it for edits."
+        : "Approved — a reviewer must send the job back before elements can be edited."
+      : null;
 
   return (
     <div>
@@ -233,7 +268,7 @@ export function JobDetail({ id }: { id: string }) {
             <span>
               {job.project_name} <span className="text-muted">—</span> {job.level}
             </span>
-            <ModuleBadge module={job.module} />
+            {!isMeasurement ? <ModuleBadge module={job.module} /> : null}
             <StatusPill status={job.status} progress={job.progress} size="md" />
           </span>
         }
@@ -252,16 +287,25 @@ export function JobDetail({ id }: { id: string }) {
             <Button variant="secondary" leftIcon={<RefreshCw />} onClick={() => void onReprocess()} loading={acting === "reprocess"} disabled={processing || !!acting}>
               Reprocess
             </Button>
-            <Button variant="secondary" leftIcon={<Calculator />} onClick={() => void onRecalculate()} loading={acting === "recalculate"} disabled={job.status !== "ready" || !!acting} title={job.status !== "ready" ? "Available when the job is ready for review" : undefined}>
-              Recalculate
-            </Button>
+            {!isMeasurement ? (
+              // Measurement quantities are recomputed by "Save & recompute" on the Elements tab, so no separate button.
+              <Button variant="secondary" leftIcon={<Calculator />} onClick={() => void onRecalculate()} loading={acting === "recalculate"} disabled={job.status !== "ready" || !!acting} title={job.status !== "ready" ? "Available when the job is ready for review" : undefined}>
+                Recalculate
+              </Button>
+            ) : null}
             {canSendBack ? (
               <Button variant="secondary" leftIcon={<Undo2 />} onClick={() => setSendBackOpen(true)} disabled={!!acting} title="Return the job to the engineer with a reason">
                 Send back
               </Button>
             ) : null}
             {canApprove && job.status === "ready" ? (
-              <Button leftIcon={<BadgeCheck />} onClick={() => void onApprove()} loading={acting === "approve"} disabled={!!acting}>
+              <Button
+                leftIcon={<BadgeCheck />}
+                onClick={() => void onApprove()}
+                loading={acting === "approve"}
+                disabled={!!acting || elementsDirty}
+                title={elementsDirty ? "Save or discard the element edits first" : undefined}
+              >
                 Approve
               </Button>
             ) : null}
@@ -313,7 +357,18 @@ export function JobDetail({ id }: { id: string }) {
       ) : null}
 
       {!readOnly && lowConfidence > 0 ? (
-        <Alert tone="warning" className="mb-6" title={`${lowConfidence} ${job.module === "structural" ? "member" : "item"}${lowConfidence === 1 ? "" : "s"} with low confidence`}>
+        <Alert
+          tone="warning"
+          className="mb-6"
+          title={`${lowConfidence} ${lowConfidenceNoun}${lowConfidence === 1 ? "" : "s"} with low confidence`}
+          actions={
+            isMeasurement && tab !== "elements" ? (
+              <Button size="sm" variant="secondary" onClick={() => setTab("elements")}>
+                Check elements
+              </Button>
+            ) : undefined
+          }
+        >
           Review the rows marked <ConfidenceBadge value={0.3} size="xs" showPct={false} className="mx-1 align-middle" /> before approving.
         </Alert>
       ) : null}
@@ -322,7 +377,19 @@ export function JobDetail({ id }: { id: string }) {
         <div className="min-w-0">
           <Tabs items={tabs} value={tab} onChange={(k) => setTab(k)} className="mb-5" />
 
-          {tab === "summary" ? (
+          {isMeasurement && tab === "measure" ? job.measurement ? <MeasurementSheetTab measurement={job.measurement} /> : <PendingPanel job={job} /> : null}
+          {isMeasurement && tab === "boq" ? job.measurement ? <MeasurementBOQTab boq={job.measurement.boq} /> : <PendingPanel job={job} /> : null}
+          {isMeasurement && tab === "materials" ? job.measurement ? <MaterialsTab materials={job.measurement.materials} /> : <PendingPanel job={job} /> : null}
+          {isMeasurement && tab === "elements" ? (
+            processing ? (
+              <PendingPanel job={job} />
+            ) : (
+              // Remount on every server change so the local draft always starts from the saved elements.
+              <ElementsTab key={`${job.id}-${job.updated_at}-${job.status}`} job={job} onJobUpdate={setJob} readOnly={readOnly} readOnlyReason={readOnlyReason} onDirtyChange={setElementsDirty} />
+            )
+          ) : null}
+
+          {!isMeasurement && tab === "summary" ? (
             job.module === "structural" ? (
               <StructuralSummary job={job} onGoTo={setTab} />
             ) : (
@@ -393,6 +460,7 @@ export function JobDetail({ id }: { id: string }) {
                     </span>
                   </Row>
                 ) : null}
+                {isMeasurement ? <Row label="Elements">{formatInt(countElements(job.elements))}</Row> : null}
                 {job.module === "structural" && job.work_description ? <Row label="Work">{job.work_description}</Row> : null}
                 <Row label="Sheets">{formatInt(job.sheet_count)}</Row>
                 <Row label="Created">
@@ -408,7 +476,7 @@ export function JobDetail({ id }: { id: string }) {
             </CardBody>
           </Card>
 
-          {job.module === "structural" ? <GeneralNotesCard job={job} /> : <LegendCard job={job} />}
+          {isMeasurement ? <AssumptionsCard job={job} /> : job.module === "structural" ? <GeneralNotesCard job={job} /> : <LegendCard job={job} />}
         </aside>
       </div>
 
@@ -547,6 +615,40 @@ function PendingPanel({ job }: { job: JobRecord }) {
 /* ------------------------------------------------------------------------- */
 /* Rail cards                                                                  */
 /* ------------------------------------------------------------------------- */
+
+/** Read-only summary of the measurement assumptions; edit them on the Elements tab. */
+function AssumptionsCard({ job }: { job: JobRecord }) {
+  const a = job.elements?.assumptions;
+  if (!a) return null;
+  const warnings = job.elements?.warnings ?? [];
+  return (
+    <Card>
+      <CardHeader title="Assumptions" description="Applied where the drawing is silent. Edit on the Elements tab." className="py-3" />
+      <CardBody className="py-3">
+        <div className="flex flex-wrap gap-1.5">
+          <Chip title="Floor height">H {formatM(a.floor_height_m)} m</Chip>
+          <Chip title="Wall thickness">Wall {Math.round(a.wall_thickness_m * 1000)} mm</Chip>
+          <Chip title="Slab thickness">Slab {Math.round(a.slab_thickness_m * 1000)} mm</Chip>
+          <Chip title="Construction">{a.construction === "mivan" ? "Mivan" : "Conventional"}</Chip>
+          <Chip title="Concrete grade">{a.concrete_grade}</Chip>
+        </div>
+        {a.notes.length ? (
+          <ul className="mt-3 list-disc space-y-1 pl-4 text-[12.5px] text-muted">
+            {a.notes.slice(0, 6).map((t, i) => (
+              <li key={i}>{t}</li>
+            ))}
+            {a.notes.length > 6 ? <li className="list-none text-[12px]">+{a.notes.length - 6} more</li> : null}
+          </ul>
+        ) : null}
+        {warnings.length ? (
+          <p className="mt-3 flex items-center gap-1.5 text-[12.5px] text-warning">
+            <AlertTriangle className="size-3.5" /> {warnings.length} reading warning{warnings.length === 1 ? "" : "s"} — see the Measurement Sheet tab
+          </p>
+        ) : null}
+      </CardBody>
+    </Card>
+  );
+}
 
 function GeneralNotesCard({ job }: { job: JobRecord }) {
   const n = job.general_notes;

@@ -17,9 +17,9 @@ import { StatusPill } from "@/components/ui/StatusPill";
 import { EmptyRow, SkeletonRows, Table, TableWrap } from "@/components/ui/Table";
 import { useToast } from "@/components/ui/Toast";
 import { deleteJob, listJobs } from "@/lib/api";
-import { MODULE_META, STATUS_META, isProcessing } from "@/lib/constants";
+import { STATUS_META, isProcessing } from "@/lib/constants";
 import { formatDate, formatInt, formatRelative } from "@/lib/format";
-import type { JobStatus, JobSummaryRecord, Module } from "@/lib/types";
+import type { JobStatus, JobSummaryRecord } from "@/lib/types";
 import { useUser } from "@/lib/user-context";
 import { errorMessage } from "@/lib/utils";
 
@@ -33,7 +33,6 @@ export default function JobsPage() {
   const { profile, isAdmin } = useUser();
 
   const [status, setStatus] = useState<JobStatus | "">("");
-  const [module, setModule] = useState<Module | "">("");
   const [page, setPage] = useState(0);
   const [items, setItems] = useState<JobSummaryRecord[] | null>(null);
   const [total, setTotal] = useState(0);
@@ -46,7 +45,7 @@ export default function JobsPage() {
       else setRefreshing(true);
       setError(null);
       try {
-        const res = await listJobs({ limit: PAGE_SIZE, offset: page * PAGE_SIZE, status, module });
+        const res = await listJobs({ limit: PAGE_SIZE, offset: page * PAGE_SIZE, status });
         setItems(res.items);
         setTotal(res.total);
       } catch (err) {
@@ -56,7 +55,7 @@ export default function JobsPage() {
         setRefreshing(false);
       }
     },
-    [page, status, module],
+    [page, status],
   );
 
   useEffect(() => {
@@ -112,24 +111,6 @@ export default function JobsPage() {
           <div className="w-44">
             <Select
               size="sm"
-              value={module}
-              onChange={(e) => {
-                setModule(e.target.value as Module | "");
-                setPage(0);
-              }}
-              aria-label="Filter by module"
-            >
-              <option value="">All modules</option>
-              {(Object.keys(MODULE_META) as Module[]).map((m) => (
-                <option key={m} value={m}>
-                  {MODULE_META[m].label}
-                </option>
-              ))}
-            </Select>
-          </div>
-          <div className="w-44">
-            <Select
-              size="sm"
               value={status}
               onChange={(e) => {
                 setStatus(e.target.value as JobStatus | "");
@@ -160,7 +141,6 @@ export default function JobsPage() {
           <Table>
             <thead>
               <tr>
-                <th>Module</th>
                 <th>Project / level</th>
                 <th>Status</th>
                 <th>Headline</th>
@@ -173,26 +153,25 @@ export default function JobsPage() {
             </thead>
             <tbody>
               {items === null ? (
-                <SkeletonRows rows={8} cols={9} />
+                <SkeletonRows rows={8} cols={8} />
               ) : items.length === 0 ? (
-                <EmptyRow colSpan={9}>
+                <EmptyRow colSpan={8}>
                   <EmptyState
                     compact
                     icon={<FolderOpen />}
-                    title={status || module ? "No jobs match these filters" : "No jobs yet"}
-                    description={status || module ? "Try clearing the filters." : "Upload drawings to create your first measurement job."}
+                    title={status ? "No jobs match this filter" : "No jobs yet"}
+                    description={status ? "Try clearing the filter." : "Upload a drawing to create your first measurement job."}
                     action={
-                      status || module ? (
+                      status ? (
                         <Button
                           variant="secondary"
                           size="sm"
                           onClick={() => {
                             setStatus("");
-                            setModule("");
                             setPage(0);
                           }}
                         >
-                          Clear filters
+                          Clear filter
                         </Button>
                       ) : (
                         <ButtonLink href="/new" size="sm" leftIcon={<Plus />}>
@@ -205,20 +184,20 @@ export default function JobsPage() {
               ) : (
                 items.map((j) => (
                   <tr key={j.id} className="row-hover cursor-pointer" onClick={() => router.push(`/jobs/${j.id}`)}>
-                    <td>
-                      <ModuleBadge module={j.module} />
-                    </td>
-                    <td className="max-w-[260px]">
-                      <Link href={`/jobs/${j.id}`} className="block truncate font-medium text-ink hover:text-brand" onClick={(e) => e.stopPropagation()}>
-                        {j.project_name}
-                      </Link>
+                    <td className="max-w-[300px]">
+                      <span className="flex items-center gap-2">
+                        <Link href={`/jobs/${j.id}`} className="truncate font-medium text-ink hover:text-brand" onClick={(e) => e.stopPropagation()}>
+                          {j.project_name}
+                        </Link>
+                        {j.module !== "measurement" ? <ModuleBadge module={j.module} /> : null}
+                      </span>
                       <p className="truncate text-[12px] text-muted">{j.level}</p>
                     </td>
                     <td className="min-w-[150px]">
                       <StatusPill status={j.status} progress={j.progress} />
                       {isProcessing(j.status) ? <ProgressBar value={j.progress} size="xs" className="mt-1.5 w-28" /> : null}
                     </td>
-                    <td className="max-w-[220px] truncate text-[12.5px]" title={j.headline}>
+                    <td className="max-w-[260px] truncate text-[12.5px]" title={j.headline || undefined}>
                       {j.headline || "—"}
                     </td>
                     <td className="num" title={j.file_names.join("\n")}>

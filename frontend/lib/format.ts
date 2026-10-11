@@ -174,6 +174,45 @@ export function formatQtyByUnit(map: Record<string, number> | null | undefined):
     .join(" · ");
 }
 
+/** Decimals to show for a measurement quantity in `unit` (IS 1200 sheets: counts whole, others 2 dp). */
+export function qtyDigits(unit: string): number {
+  const u = unit.toLowerCase();
+  if (u === "nos" || u === "ls" || u === "item") return 0;
+  return 2;
+}
+
+/** Measurement quantity with its unit, e.g. "11.63 cum" / "4 nos". */
+export function formatMeasure(qty: number | null | undefined, unit: string): string {
+  if (qty === null || qty === undefined || !Number.isFinite(qty)) return "—";
+  return `${formatNumber(qty, qtyDigits(unit))} ${unit}`;
+}
+
+/** Preferred display order for trades in the measurement totals strip. */
+const TRADE_ORDER = ["RCC", "Formwork", "Steel", "Blockwork", "Plaster", "Flooring", "Skirting", "Dado", "Painting", "Waterproofing", "Doors", "Windows"];
+
+/**
+ * "RCC 11.6 cum · Flooring 14.4 sqm · Painting 66 sqm" from `MeasurementResult.totals_by_trade`.
+ * Returns the parts so callers can render chips; join with " · " for a one-liner.
+ */
+export function totalsByTradeParts(totals: Record<string, Record<string, number>> | null | undefined): { trade: string; unit: string; value: number; label: string }[] {
+  if (!totals) return [];
+  const trades = Object.keys(totals).sort((a, b) => {
+    const ia = TRADE_ORDER.indexOf(a);
+    const ib = TRADE_ORDER.indexOf(b);
+    if (ia === -1 && ib === -1) return a.localeCompare(b);
+    return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib);
+  });
+  const out: { trade: string; unit: string; value: number; label: string }[] = [];
+  for (const trade of trades) {
+    for (const [unit, value] of Object.entries(totals[trade] ?? {})) {
+      if (!Number.isFinite(value) || value === 0) continue;
+      const digits = qtyDigits(unit) === 0 ? 0 : 1;
+      out.push({ trade, unit, value, label: `${trade} ${formatNumber(value, digits)} ${unit}` });
+    }
+  }
+  return out;
+}
+
 /** "2-T20 + 2-T16" */
 export function formatBars(groups: BarGroup[] | null | undefined): string {
   if (!groups || groups.length === 0) return "—";

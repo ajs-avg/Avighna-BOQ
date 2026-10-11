@@ -9,6 +9,36 @@ Every job has `module`: `"structural"` (RCC drawings → Bar Bending Schedule, o
 `"fitout"` (interior design drawings → Bill of Quantities, output in m² / lm / nos).
 Result fields differ: structural fills `members` + `result` (BBSResult); fit-out fills `fitout_items` + `rooms` + `boq` (BOQResult).
 
+
+## Measurement module (THE product — default `module: "measurement"`)
+Drawing → elements (rooms, openings, walls, slabs, members, misc) → measurement sheet blocks (IS 1200) → BOQ abstract → materials.
+`JobRecord.elements: MeasurementExtraction` (what was read; editable) and `JobRecord.measurement: MeasurementResult` (computed).
+| Method | Path | Body | Returns | Role |
+|---|---|---|---|---|
+| PUT | `/api/v1/jobs/{id}/elements` | `{elements: MeasurementExtraction}` (whole set after edits) | `JobRecord` (recomputed) | any (job must be ready/approved/failed) |
+
+```ts
+export type WallType = 'rcc'|'block'|'partition'|'glass'|'other';
+export type OpeningKind = 'door'|'window'|'opening'|'ventilator';
+interface ElBase { id:string; confidence:number; evidence:string[]; source_sheet?:string|null }
+export interface RoomEl extends ElBase { name:string; level:string; length_m:number; width_m:number; height_m:number; area_m2?:number|null; perimeter_m?:number|null; floor_finish:string; wall_finish:string; ceiling_finish:string; skirting_mm:number; dado_height_m:number; wet_area:boolean; plastered:boolean; remarks?:string|null }
+export interface OpeningEl extends ElBase { tag:string; kind:OpeningKind; width_m:number; height_m:number; count:number; room:string; wall_tag:string; description:string; level:string }
+export interface WallEl extends ElBase { tag:string; wall_type:WallType; length_m:number; thickness_m:number; height_m:number; count:number; room:string; level:string; both_faces:boolean }
+export interface SlabEl extends ElBase { tag:string; length_m:number; width_m:number; thickness_m:number; count:number; level:string; beam_width_m:number }
+export interface MemberEl extends ElBase { tag:string; kind:'column'|'beam'; width_m:number; depth_m:number; length_m:number; count:number; level:string; slab_thickness_m:number }
+export interface MiscEl extends ElBase { tag?:string|null; description:string; unit:'nos'|'sqm'|'rmt'|'cum'|'kg'|'LS'; qty:number; trade:string; room:string; level:string }
+export interface ProjectAssumptions { floor_height_m:number; wall_thickness_m:number; slab_thickness_m:number; construction:'mivan'|'conventional'; concrete_grade:string; notes:string[] }
+export interface MeasurementExtraction { rooms:RoomEl[]; openings:OpeningEl[]; walls:WallEl[]; slabs:SlabEl[]; members:MemberEl[]; misc:MiscEl[]; assumptions:ProjectAssumptions; warnings:string[] }
+export interface MeasurementRow { sr:number; location:string; nos:number; l_m?:number|null; b_m?:number|null; h_m?:number|null; qty:number; deduction:boolean; rule:string; element_id?:string|null }
+export interface MeasurementBlock { item_code:string; item_title:string; unit:string; trade:string; rows:MeasurementRow[]; total:number }
+export interface BOQAbstractLine { item_no:number; item_code:string; trade:string; description:string; unit:string; qty:number; rate?:number|null; amount?:number|null; basis:'measured'|'thumb_rule'|'manual' }
+export interface MaterialRow { material:string; for_item_code:string; boq_qty:number; boq_unit:string; norm:number; norm_unit:string; wastage_pct:number; required:number; basis:string }
+export interface MeasurementResult { blocks:MeasurementBlock[]; boq:BOQAbstractLine[]; materials:MaterialRow[]; totals_by_trade:Record<string,Record<string,number>>; warnings:string[] }
+// JobRecord gains: module:'measurement'|'structural'|'fitout'; elements?:MeasurementExtraction|null; measurement?:MeasurementResult|null
+// POST /api/v1/jobs: `module` defaults to "measurement"; fields project_name, level (floor/wing), location?, contractor?, drawn_by?
+```
+Measurement rows are computed from elements only (never typed directly); to change a quantity the user edits the element (room size, opening, wall) or adds a `MiscEl` row.
+
 ## Endpoints
 | Method | Path | Body / Query | Returns | Role |
 |---|---|---|---|---|

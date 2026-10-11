@@ -279,3 +279,140 @@ What to produce
 - rooms: every named room with area/perimeter from the facts and its finishes.
 - legend: every code->description pair you can read (finish legends, lighting/FF&E schedules).
 Never invent a quantity. If a quantity cannot be supported, set qty 0 and explain in remarks. Evidence must quote the sheet text. Confidence 0-1."""
+
+
+# ----------------------------------------------------------------------------- measurement (the product)
+class AIMRoom(BaseModel):
+    name: str
+    level: str = ""
+    length_mm: float = Field(description="Internal clear length")
+    width_mm: float = Field(description="Internal clear width")
+    height_mm: Optional[float] = Field(None, description="Floor to ceiling; null if not on sheet")
+    area_m2: Optional[float] = Field(None, description="Only for non-rectangular rooms, from measured facts or dimensions")
+    perimeter_m: Optional[float] = None
+    floor_finish: str = Field("", description="e.g. 'vitrified tile flooring 600x600 mm' or code + description from legend")
+    wall_finish: str = Field("", description="paint / wallpaper / tiles ...")
+    ceiling_finish: str = ""
+    skirting_mm: float = 100
+    dado_height_m: float = Field(0, description="Wall tiles height for bathrooms/kitchens, else 0")
+    wet_area: bool = False
+    plastered: bool = Field(True, description="False when walls are RCC/Mivan (putty only)")
+    confidence: float = 0.5
+    evidence: List[str] = Field(default_factory=list)
+
+
+class AIMOpening(BaseModel):
+    tag: str
+    kind: Literal["door", "window", "opening", "ventilator"] = "door"
+    width_mm: float
+    height_mm: float
+    count: int = 1
+    room: str = ""
+    wall_tag: str = ""
+    description: str = ""
+    level: str = ""
+    confidence: float = 0.5
+    evidence: List[str] = Field(default_factory=list)
+
+
+class AIMWall(BaseModel):
+    tag: str
+    wall_type: Literal["rcc", "block", "partition", "glass", "other"] = "block"
+    length_mm: float
+    thickness_mm: float
+    height_mm: float
+    count: int = 1
+    room: str = ""
+    level: str = ""
+    both_faces: bool = True
+    confidence: float = 0.5
+    evidence: List[str] = Field(default_factory=list)
+
+
+class AIMSlab(BaseModel):
+    tag: str = "S1"
+    length_mm: float
+    width_mm: float
+    thickness_mm: float = 150
+    count: int = 1
+    level: str = ""
+    beam_width_mm: float = 230
+    confidence: float = 0.5
+    evidence: List[str] = Field(default_factory=list)
+
+
+class AIMMember(BaseModel):
+    tag: str
+    kind: Literal["column", "beam"] = "column"
+    width_mm: float
+    depth_mm: float
+    length_mm: float = Field(description="Height for columns, clear span for beams")
+    count: int = 1
+    level: str = ""
+    slab_thickness_mm: float = 0
+    confidence: float = 0.5
+    evidence: List[str] = Field(default_factory=list)
+
+
+class AIMMisc(BaseModel):
+    tag: Optional[str] = None
+    description: str
+    unit: Literal["nos", "sqm", "rmt", "cum", "kg", "LS"] = "nos"
+    qty: float
+    trade: str = "Miscellaneous"
+    room: str = ""
+    level: str = ""
+    confidence: float = 0.5
+    evidence: List[str] = Field(default_factory=list)
+
+
+class AIMAssumptions(BaseModel):
+    floor_height_mm: Optional[float] = None
+    wall_thickness_mm: Optional[float] = None
+    slab_thickness_mm: Optional[float] = None
+    construction: Literal["mivan", "conventional"] = "conventional"
+    concrete_grade: str = "M40"
+    notes: List[str] = Field(default_factory=list)
+
+
+class AIMeasurementExtraction(BaseModel):
+    rooms: List[AIMRoom] = Field(default_factory=list)
+    openings: List[AIMOpening] = Field(default_factory=list)
+    walls: List[AIMWall] = Field(default_factory=list)
+    slabs: List[AIMSlab] = Field(default_factory=list)
+    members: List[AIMMember] = Field(default_factory=list)
+    misc: List[AIMMisc] = Field(default_factory=list)
+    assumptions: AIMAssumptions = Field(default_factory=AIMAssumptions)
+    warnings: List[str] = Field(default_factory=list)
+
+
+def measurement_prompt(sheet_label: str, sheet_type: str, units: str, measured_facts: str,
+                       text_listing: str, known_assumptions: str) -> str:
+    return f"""You are taking off quantities from this construction drawing for an Indian measurement sheet
+(IS 1200 style: every room, wall, opening and member becomes a row Nos x L x B x H).
+
+Sheet: {sheet_label} (type: {sheet_type}). Drawing units: {units}. Output ALL dimensions in MILLIMETRES.
+Project assumptions known so far: {known_assumptions or 'none'}
+
+MEASURED FACTS from the CAD geometry (trust these numbers over estimates; rooms here come with area and perimeter):
+{measured_facts}
+
+EXACT machine text on the sheet (normalised coordinates 0-1000, y=0 at top; [layer] in brackets):
+{text_listing}
+
+Extract, as completely as you can:
+- rooms: every named space (bedroom, living, kitchen, toilet, balcony, passage, lobby...) with internal clear length x width
+  (from dimension strings; if the room is irregular give area_m2/perimeter_m from the measured facts), floor-to-ceiling height
+  if shown (else null), finishes from the finish schedule/legend or notes (floor, wall, ceiling), skirting, dado height for wet
+  areas, wet_area true for toilets/bathrooms/kitchen/utility/balcony, plastered=false when walls are RCC (Mivan).
+- openings: every door/window/ventilator with tag, size, count, the room it serves and the wall tag if walls are tagged;
+  description from the door/window schedule (type, material).
+- walls: when the drawing shows walls with tags or clear lengths (structural/Mivan plans, wall layouts): tag, type
+  (rcc / block / partition / glass), length, thickness, height, count, room, level.
+- slabs / members (columns, beams): when a structural plan or schedule is on the sheet, with sizes and counts.
+- misc: every other countable item a quantity surveyor would bill from THIS sheet - sanitary fixtures, kitchen platform,
+  railings (rmt), lofts, electrical points (nos), AC points, lights, joinery, wardrobes, lintels, chajjas, parapets etc.
+  Use your own judgement for the right unit (nos / sqm / rmt / cum / kg / LS) and a clear CPWD-style description.
+- assumptions: floor height, wall/slab thickness, construction type and concrete grade from the notes.
+Rules: never invent dimensions; copy them from the text. Give evidence (quoted text) and confidence per element. If the
+sheet has nothing measurable (cover, index, perspective), return empty lists with a warning."""

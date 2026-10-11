@@ -147,14 +147,35 @@ def load_dxf_lenient(path: Path):
     structure LibreDWG writes: dangling layout keys, bad sort tables, odd MTEXT versions)."""
     import ezdxf
     from ezdxf import recover
+    doc = None
     try:
-        return ezdxf.readfile(str(path))
+        doc = ezdxf.readfile(str(path))
     except Exception as exc:  # DXFStructureError, KeyError on layouts, ...
         log.info("plain DXF load failed for %s (%s); using recover mode", path.name, str(exc)[:80])
-    doc, auditor = recover.readfile(str(path))
-    if auditor.has_errors:
-        log.info("DXF %s recovered with %d errors / %d fixes", path.name, len(auditor.errors), len(auditor.fixes))
+    if doc is None:
+        doc, auditor = recover.readfile(str(path))
+        if auditor.has_errors:
+            log.info("DXF %s recovered with %d errors / %d fixes", path.name, len(auditor.errors), len(auditor.fixes))
+    fixed = normalise_layers(doc)
+    if fixed:
+        log.info("DXF %s: %d layers were written as 'off' (negative colour); switched on", path.name, fixed)
     return doc
+
+
+def normalise_layers(doc) -> int:
+    """LibreDWG 0.13 writes every layer with a *negative* colour index, which DXF defines as
+    'layer switched off'. ezdxf's renderer then draws nothing (empty page, no preview, no AI image)
+    and the frontend hides every entity. A drawing with (almost) all layers off is unplottable, so
+    when 80 % or more of the layers are off we switch them back on. Returns the number fixed."""
+    layers = list(doc.layers)
+    if not layers:
+        return 0
+    off = [lay for lay in layers if int(lay.dxf.get("color", 7)) < 0]
+    if len(off) < max(1, int(0.8 * len(layers))):
+        return 0
+    for lay in off:
+        lay.dxf.color = abs(int(lay.dxf.color))
+    return len(off)
 
 
 def sanitize_dxf(path: Path) -> bool:

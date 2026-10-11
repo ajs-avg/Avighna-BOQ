@@ -39,11 +39,11 @@ BOQ/
 ## Pipeline stages (backend/app/pipeline.py)
 | Stage | What happens | Where |
 |---|---|---|
-| converting | detect real format from bytes; DWG → DXF via LibreDWG (several builds tried) | extract/detect.py, extract/dwg_convert.py |
+| converting | detect real format from bytes; DWG → DXF via LibreDWG 0.13.4 (several builds tried); the DXF is sanitised (sort tables stripped, all-off layers switched on) | extract/detect.py, extract/dwg_convert.py |
 | analysing | read every sheet into a text inventory (exact vector text + coordinates), render a preview PNG (DXF in an isolated subprocess), classify (Gemini fast model, else keyword heuristic) | extract/pdf_reader.py, dxf_reader.py, render_cli.py, heuristics.py |
-| extracting | **structural**: Gemini pro reads members from image + rebuilt schedule tables + text → `BeamSpec`… ; **fit-out**: deterministic CAD facts (hatch areas with finish codes via leaders, tag counts, polyline lengths, rooms) + Gemini → `FitoutItem`/`RoomRecord`; without a key the heuristic readers produce the same shapes | ai/*, extract/fitout_geometry.py, heuristics.py |
-| quantifying | deterministic engines: BBS rows (cut lengths, bar counts, weights, dia-wise tons) or BOQ sections/lines/totals | engine/* |
-| ready | result stored; export generated on demand and cached per version | export/* |
+| extracting | **measurement (default)**: per sheet, deterministic CAD facts (room outlines with area/perimeter, hatch areas with finish codes, door/window tag counts, polyline lengths) + the exact vector text go to Gemini pro with the preview image → `MeasurementExtraction` (rooms, openings, walls, slabs, columns/beams, misc items, assumptions, each with confidence + evidence); sheets are merged (dedupe by tag + level). If a preview failed the model still reads text-only; if the model fails the CAD-outline fallback is used and a visible job event says so. Old modules: **structural** → `BeamSpec`…, **fit-out** → `FitoutItem`/`RoomRecord` | ai/prompts.py (`measurement_prompt`), ai/mappers.py, extract/fitout_geometry.py, heuristics.py |
+| quantifying | deterministic engines. Measurement: `engine/measurement.py` builds item-wise blocks (one row per drawing object, Nos × L × B × H, IS 1200 deductions as minus rows: plaster openings ≤0.5 none / 0.5–3 one face / >3 both faces + jambs, skirting minus doors, formwork contact areas, slab over beams, steel thumb rules), the BOQ abstract (one line per item, rate blank) and the material requirement (qty × norm × wastage). Old: BBS rows or KR-style BOQ | engine/* |
+| ready | result stored; export generated on demand and cached per version. Measurement workbook: Measurement Sheet, BOQ (Abstract), Material Requirement, Tender vs Site, Elements (from drawing) — live `=C*D*E*F` and `=SUM()` formulas | export/measurement_xlsx.py, export/* |
 
 ## Design rules
 - The AI never does arithmetic that matters; it reads sheets into structured facts with evidence and

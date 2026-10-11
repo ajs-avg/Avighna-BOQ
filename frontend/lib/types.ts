@@ -3,7 +3,12 @@
  * backend/app/models/schemas.py). Keep in sync by hand.
  */
 
-export type Module = "structural" | "fitout";
+/**
+ * `measurement` is the product (drawing → measurement sheet → BOQ → materials) and the
+ * backend default. `structural` / `fitout` remain only so old jobs still render; they are
+ * never offered for new jobs.
+ */
+export type Module = "measurement" | "structural" | "fitout";
 export type JobStatus =
   | "queued"
   | "converting"
@@ -474,6 +479,180 @@ export interface BOQResult {
   warnings: string[];
 }
 
+// ---- measurement (THE product) -------------------------------------------
+// Drawing → elements (rooms, openings, walls, slabs, members, misc) → measurement
+// sheet blocks (IS 1200) → BOQ abstract → materials. Rows are computed from the
+// elements only; to change a quantity the reviewer edits the element.
+
+export type WallType = "rcc" | "block" | "partition" | "glass" | "other";
+export type OpeningKind = "door" | "window" | "opening" | "ventilator";
+export type MemberElKind = "column" | "beam";
+export type MiscUnit = "nos" | "sqm" | "rmt" | "cum" | "kg" | "LS";
+export type Construction = "mivan" | "conventional";
+export type BOQBasis = "measured" | "thumb_rule" | "manual";
+
+export const WALL_TYPES: WallType[] = ["rcc", "block", "partition", "glass", "other"];
+export const OPENING_KINDS: OpeningKind[] = ["door", "window", "opening", "ventilator"];
+export const MEMBER_EL_KINDS: MemberElKind[] = ["column", "beam"];
+export const MISC_UNITS: MiscUnit[] = ["nos", "sqm", "rmt", "cum", "kg", "LS"];
+export const CONSTRUCTIONS: Construction[] = ["mivan", "conventional"];
+
+export interface ElBase {
+  id: string;
+  confidence: number;
+  evidence: string[];
+  source_sheet?: string | null;
+}
+
+export interface RoomEl extends ElBase {
+  name: string;
+  level: string;
+  length_m: number;
+  width_m: number;
+  height_m: number;
+  area_m2?: number | null;
+  perimeter_m?: number | null;
+  floor_finish: string;
+  wall_finish: string;
+  ceiling_finish: string;
+  skirting_mm: number;
+  dado_height_m: number;
+  wet_area: boolean;
+  plastered: boolean;
+  remarks?: string | null;
+}
+
+export interface OpeningEl extends ElBase {
+  tag: string;
+  kind: OpeningKind;
+  width_m: number;
+  height_m: number;
+  count: number;
+  room: string;
+  wall_tag: string;
+  description: string;
+  level: string;
+}
+
+export interface WallEl extends ElBase {
+  tag: string;
+  wall_type: WallType;
+  length_m: number;
+  thickness_m: number;
+  height_m: number;
+  count: number;
+  room: string;
+  level: string;
+  both_faces: boolean;
+}
+
+export interface SlabEl extends ElBase {
+  tag: string;
+  length_m: number;
+  width_m: number;
+  thickness_m: number;
+  count: number;
+  level: string;
+  beam_width_m: number;
+}
+
+export interface MemberEl extends ElBase {
+  tag: string;
+  kind: MemberElKind;
+  width_m: number;
+  depth_m: number;
+  /** Height for columns, clear span for beams. */
+  length_m: number;
+  count: number;
+  level: string;
+  slab_thickness_m: number;
+}
+
+export interface MiscEl extends ElBase {
+  tag?: string | null;
+  description: string;
+  unit: MiscUnit;
+  qty: number;
+  trade: string;
+  room: string;
+  level: string;
+}
+
+export interface ProjectAssumptions {
+  floor_height_m: number;
+  wall_thickness_m: number;
+  slab_thickness_m: number;
+  construction: Construction;
+  concrete_grade: string;
+  notes: string[];
+}
+
+export interface MeasurementExtraction {
+  rooms: RoomEl[];
+  openings: OpeningEl[];
+  walls: WallEl[];
+  slabs: SlabEl[];
+  members: MemberEl[];
+  misc: MiscEl[];
+  assumptions: ProjectAssumptions;
+  warnings: string[];
+}
+
+export interface MeasurementRow {
+  sr: number;
+  location: string;
+  nos: number;
+  l_m?: number | null;
+  b_m?: number | null;
+  h_m?: number | null;
+  qty: number;
+  deduction: boolean;
+  rule: string;
+  element_id?: string | null;
+}
+
+export interface MeasurementBlock {
+  item_code: string;
+  item_title: string;
+  unit: string;
+  trade: string;
+  rows: MeasurementRow[];
+  total: number;
+}
+
+export interface BOQAbstractLine {
+  item_no: number;
+  item_code: string;
+  trade: string;
+  description: string;
+  unit: string;
+  qty: number;
+  rate?: number | null;
+  amount?: number | null;
+  basis: BOQBasis;
+}
+
+export interface MaterialRow {
+  material: string;
+  for_item_code: string;
+  boq_qty: number;
+  boq_unit: string;
+  norm: number;
+  norm_unit: string;
+  wastage_pct: number;
+  required: number;
+  basis: string;
+}
+
+export interface MeasurementResult {
+  blocks: MeasurementBlock[];
+  boq: BOQAbstractLine[];
+  materials: MaterialRow[];
+  /** trade → unit → total, e.g. { RCC: { cum: 11.6 }, Painting: { sqm: 66 } } */
+  totals_by_trade: Record<string, Record<string, number>>;
+  warnings: string[];
+}
+
 // ---- jobs -----------------------------------------------------------------
 
 export type SourceFormat = "dwg" | "dxf" | "pdf" | "image" | "unknown";
@@ -544,6 +723,10 @@ export interface JobRecord {
   rooms: RoomRecord[];
   legend: Record<string, string>;
   boq?: BOQResult | null;
+  /** Measurement module: what was read from the drawings (editable via PUT /elements). */
+  elements?: MeasurementExtraction | null;
+  /** Measurement module: computed sheet, BOQ abstract and materials. */
+  measurement?: MeasurementResult | null;
   general_notes: GeneralNotes;
   sheet_count: number;
   events: JobEvent[];

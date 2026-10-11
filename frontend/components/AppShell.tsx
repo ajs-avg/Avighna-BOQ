@@ -9,7 +9,6 @@ import {
   LogOut,
   Menu as MenuIcon,
   Plus,
-  Sliders,
   Cpu,
   Upload,
   Users,
@@ -42,7 +41,6 @@ const NAV: NavItem[] = [
   { href: "/", label: "Dashboard", icon: <LayoutDashboard />, exact: true },
   { href: "/new", label: "New Measurement", icon: <Upload /> },
   { href: "/jobs", label: "Jobs", icon: <FolderOpen /> },
-  { href: "/standards", label: "Standards", icon: <Sliders /> },
   { href: "/users", label: "Users", icon: <Users />, adminOnly: true },
 ];
 

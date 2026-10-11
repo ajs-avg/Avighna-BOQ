@@ -202,3 +202,96 @@ def merge_fitout(parts: List[FitoutExtraction]) -> FitoutExtraction:
         if it.code and it.code.upper() in out.legend and not it.specification:
             it.specification = out.legend[it.code.upper()]
     return out
+
+
+# ----------------------------------------------------------------------------- measurement
+def measurement_from_ai(ai, sheet_label: str):
+    from app.ai.prompts import AIMeasurementExtraction  # noqa: F401
+    from app.models.schemas import (
+        MeasurementExtraction, MemberEl, MiscEl, OpeningEl, ProjectAssumptions, RoomEl, SlabEl, WallEl,
+    )
+    out = MeasurementExtraction(warnings=list(ai.warnings))
+    a = ai.assumptions
+    out.assumptions = ProjectAssumptions(
+        floor_height_m=_m(a.floor_height_mm) if a.floor_height_mm else 3.0,
+        wall_thickness_m=_m(a.wall_thickness_mm) if a.wall_thickness_mm else 0.2,
+        slab_thickness_m=_m(a.slab_thickness_mm) if a.slab_thickness_mm else 0.15,
+        construction=a.construction, concrete_grade=a.concrete_grade or "M40", notes=list(a.notes))
+    fh = out.assumptions.floor_height_m
+    for r in ai.rooms:
+        if r.length_mm <= 0 or r.width_mm <= 0:
+            out.warnings.append(f"Room {r.name}: size missing, skipped")
+            continue
+        out.rooms.append(RoomEl(
+            name=r.name.strip(), level=r.level.strip(), length_m=_m(r.length_mm), width_m=_m(r.width_mm),
+            height_m=_m(r.height_mm) if r.height_mm else fh, area_m2=r.area_m2, perimeter_m=r.perimeter_m,
+            floor_finish=r.floor_finish.strip() or "Vitrified tile flooring 600x600 mm",
+            wall_finish=r.wall_finish.strip() or "interior emulsion 2 coats",
+            ceiling_finish=r.ceiling_finish.strip() or "interior emulsion 2 coats",
+            skirting_mm=r.skirting_mm, dado_height_m=r.dado_height_m, wet_area=r.wet_area, plastered=r.plastered,
+            confidence=r.confidence, evidence=r.evidence, source_sheet=sheet_label))
+    for o in ai.openings:
+        if o.width_mm <= 0 or o.height_mm <= 0:
+            continue
+        out.openings.append(OpeningEl(tag=o.tag.strip(), kind=o.kind, width_m=_m(o.width_mm), height_m=_m(o.height_mm),
+                                      count=max(1, o.count), room=o.room.strip(), wall_tag=o.wall_tag.strip(),
+                                      description=o.description.strip(), level=o.level.strip(), confidence=o.confidence,
+                                      evidence=o.evidence, source_sheet=sheet_label))
+    for w in ai.walls:
+        if w.length_mm <= 0 or w.thickness_mm <= 0 or w.height_mm <= 0:
+            continue
+        out.walls.append(WallEl(tag=w.tag.strip(), wall_type=w.wall_type, length_m=_m(w.length_mm), thickness_m=_m(w.thickness_mm),
+                                height_m=_m(w.height_mm), count=max(1, w.count), room=w.room.strip(), level=w.level.strip(),
+                                both_faces=w.both_faces, confidence=w.confidence, evidence=w.evidence, source_sheet=sheet_label))
+    for s in ai.slabs:
+        if s.length_mm <= 0 or s.width_mm <= 0:
+            continue
+        out.slabs.append(SlabEl(tag=s.tag, length_m=_m(s.length_mm), width_m=_m(s.width_mm), thickness_m=_m(s.thickness_mm or 150),
+                                count=max(1, s.count), level=s.level, beam_width_m=_m(s.beam_width_mm), confidence=s.confidence,
+                                evidence=s.evidence, source_sheet=sheet_label))
+    for m in ai.members:
+        if m.width_mm <= 0 or m.depth_mm <= 0 or m.length_mm <= 0:
+            continue
+        out.members.append(MemberEl(tag=m.tag, kind=m.kind, width_m=_m(m.width_mm), depth_m=_m(m.depth_mm), length_m=_m(m.length_mm),
+                                    count=max(1, m.count), level=m.level, slab_thickness_m=_m(m.slab_thickness_mm),
+                                    confidence=m.confidence, evidence=m.evidence, source_sheet=sheet_label))
+    for x in ai.misc:
+        if x.qty <= 0 or not x.description.strip():
+            continue
+        out.misc.append(MiscEl(tag=x.tag, description=x.description.strip(), unit=x.unit, qty=x.qty, trade=x.trade or "Miscellaneous",
+                               room=x.room, level=x.level, confidence=x.confidence, evidence=x.evidence, source_sheet=sheet_label))
+    return out
+
+
+def merge_measurement(parts):
+    """Union across sheets. Rooms/openings/walls/members with the same tag+level keep the most confident reading."""
+    from app.models.schemas import MeasurementExtraction
+    out = MeasurementExtraction()
+    seen = {}
+    best_assumptions = None
+    for p in parts:
+        out.warnings.extend(p.warnings)
+        if best_assumptions is None or (p.assumptions.notes and not best_assumptions.notes):
+            best_assumptions = p.assumptions
+        for attr, keyf in (("rooms", lambda e: ("room", e.name.upper(), e.level.upper())),
+                           ("openings", lambda e: ("op", e.tag.upper(), e.room.upper(), e.level.upper())),
+                           ("walls", lambda e: ("wall", e.tag.upper(), e.level.upper())),
+                           ("slabs", lambda e: ("slab", e.tag.upper(), e.level.upper())),
+                           ("members", lambda e: ("mem", e.tag.upper(), e.level.upper())),
+                           ("misc", lambda e: ("misc", (e.tag or e.description).upper(), e.room.upper(), e.level.upper()))):
+            lst = getattr(out, attr)
+            for e in getattr(p, attr):
+                k = keyf(e)
+                if k in seen:
+                    old = lst[seen[k]]
+                    if e.confidence > old.confidence:
+                        e.evidence = list(dict.fromkeys(old.evidence + e.evidence))[:10]
+                        lst[seen[k]] = e
+                    else:
+                        old.evidence = list(dict.fromkeys(old.evidence + e.evidence))[:10]
+                else:
+                    seen[k] = len(lst)
+                    lst.append(e)
+    if best_assumptions is not None:
+        out.assumptions = best_assumptions
+    return out

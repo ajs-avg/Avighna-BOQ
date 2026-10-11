@@ -3,17 +3,22 @@
 **Drop a drawing, get a measurement sheet.** A red-and-white platform for Avighna Group where engineers upload
 construction drawings (DWG / DXF / PDF / images) and receive an audited Excel measurement sheet.
 
-Two modules on one platform:
+One simple flow: **drop the drawing → measurement sheet → BOQ abstract → material requirement**, in one Excel file.
 
-| Module | Input | Output |
-|---|---|---|
-| **Structural** | RC drawings (beam / column / slab schedules, framing plans) | Bar Bending Schedule in Avighna's own sheet layout, dia-wise tonnage summary, live Excel formulas |
-| **Interior fit-out** | ID drawings (finishes plans, RCP, joinery details, FF&E / lighting plans) | Bill of Quantities in the KR-style DIV-09 / DIV-13 / FF&E layout with a measurement back-up tab |
+| Tab | What it holds |
+|---|---|
+| **Measurement Sheet** | Item-wise blocks (RCC walls, formwork, flooring, skirting, plaster, paint, doors…). Each row is one object from the drawing with Nos × L × B × H; deductions are minus rows per IS 1200; totals are live `=SUM()` formulas |
+| **BOQ (Abstract)** | One line per item with a CPWD-style description, quantity linked to the measurement sheet, unit. Rates are left blank on purpose |
+| **Material Requirement** | Cement bags, sand, aggregate, steel kg, tiles nos, paint litres… = BOQ qty × consumption norm × wastage, plus a summary by material |
+| **Tender vs Site** | Template to compare tender quantities with site measurements |
+| **Elements (from drawing)** | The rooms / openings / walls / slabs / members the AI read, with confidence and evidence, for checking |
 
-How it works: files are converted (DWG → DXF), every sheet is read (vector text, tables, CAD geometry),
-classified, then read into structured members / items (Gemini vision with the exact machine text, or a
-deterministic fallback when AI is off). All arithmetic runs in a deterministic engine that mirrors the
-company's Excel formulas; reviewers correct inputs in the UI and approve before the Excel is released.
+How it works: files are converted (DWG → DXF), every sheet is read (vector text, dimensions, CAD geometry such as
+room outlines, hatch areas and door tags), classified, then Gemini 2.5 Pro reads rooms, openings, walls, slabs,
+columns/beams and other items from the image plus the exact machine text. All arithmetic runs in a deterministic
+measurement engine (IS 1200 rules, formwork contact areas, steel thumb rules, material norms); reviewers correct
+the elements in the UI, recompute, and approve before the Excel is released. The earlier structural BBS and
+KR-style fit-out BOQ engines are still in the API for old jobs but are not offered for new ones.
 
 ## Repository
 ```
@@ -45,20 +50,21 @@ Open http://localhost:3000 and sign in with the first admin from `backend/.env` 
 from the Users page (a temporary password is shown once).
 
 Add `GEMINI_API_KEY=...` to `backend/.env` to turn on AI reading of sheets. Without it the app still runs:
-sheets are classified by keywords, fit-out quantities come from CAD geometry only, and structural members
-are read from schedule text where the tag, size and bars sit on one line.
+sheets are classified by keywords and rooms/doors come from CAD outlines and tags only (sizes shown as
+equivalent squares, marked low confidence), so the AI key is strongly recommended.
 
 ### DWG conversion
-`LibreDWG dwg2dxf` is used locally (`/opt/anaconda3/envs/dwgtools/bin/dwg2dxf`, installed via conda). It reads
-most plans but fails on some AutoCAD 2024 files (joinery details, elevations). ODA File Converter is the
-robust option but needs macOS 13+; this machine runs macOS 12. When a DWG cannot be converted, the job keeps
-going with the other files and reports the skipped file; upload the PDF plot or a DXF export instead.
+`LibreDWG dwg2dxf` 0.13.4 is used (built from source at `~/.local/opt/libredwg-0.13.4` on the Mac, built in the
+Docker image on Render); it converts every AutoCAD-2024 file of the reference packages. Its DXF output needs two
+fixes the backend applies automatically: sort tables ezdxf rejects are stripped, and layers written as "off"
+(negative colour) are switched on, otherwise nothing renders. When a DWG still cannot be converted, the job
+keeps going with the other files and reports the skipped file; upload the PDF plot or a DXF export instead.
 
 ## Samples and demos
-- `samples/sample_beam_schedule_14th_floor.pdf` — a synthetic beam + column schedule in Avighna's notation
-  (regenerate with `python3 tools/make_sample_structural_pdf.py`). Upload it as a Structural job to see the BBS flow.
-- The Dubai office package in `~/Downloads/20250930 Detail Design Submission R1/` is the fit-out reference: upload the
-  `Drawing Package/cad/.../KR-AGO-ID-GA-10x` DWGs (plus `Xref_Base Plan.dwg`) and/or pages of the DD PDF as a Fit-out job.
+- The Dubai office package in `~/Downloads/20250930 Detail Design Submission R1/` is the reference: upload the
+  `Drawing Package/cad/.../KR-AGO-ID-GA-100`, `GA-103` and `DS-601-602` DWGs (or pages of the DD PDF) as one job.
+- `samples/sample_beam_schedule_14th_floor.pdf` — a synthetic beam + column schedule (old structural module;
+  regenerate with `python3 tools/make_sample_structural_pdf.py`).
 
 ## Deploy (Vercel + Render + Supabase)
 Cloud mode is switched on by environment variables only: `DATABASE_URL` (Supabase Postgres),
