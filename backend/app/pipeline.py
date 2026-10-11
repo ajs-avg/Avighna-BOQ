@@ -244,19 +244,25 @@ class Pipeline:
                 sh = _Sheet(rec, inv, kind, path)
                 sh.hints = hints
                 try:
+                    full_px = max(s.preview_full_max_px, s.gemini_max_image_px)
+                    full_dpi = max(s.preview_dpi, int(full_px / 33.1) + 1)   # A1 landscape is 33.1 in wide
                     if kind == "pdf":
-                        png = render_page_png(path, inv.page_no, max_px=s.gemini_max_image_px, dpi=s.preview_dpi)
+                        png = render_page_png(path, inv.page_no, max_px=full_px, dpi=full_dpi)
                     elif kind == "dxf":
                         clear_cache()   # the renderer is a separate process; don't hold a second copy here
                         big = path.stat().st_size > 6_000_000
-                        png = render_layout_png(path, inv.layout, max_px=s.gemini_max_image_px, dpi=s.preview_dpi,
+                        png = render_layout_png(path, inv.layout, max_px=full_px, dpi=full_dpi,
                                                 timeout_s=420 if big else 180)
                     else:
-                        png = render_image_png(path, inv.page_no, max_px=s.gemini_max_image_px)
-                    sh.hi_png = png
-                    pv = previews / f"{rec.id}.png"
+                        png = render_image_png(path, inv.page_no, max_px=full_px)
+                    sh.hi_png = _downscale(png, s.gemini_max_image_px)   # what the model sees
+                    pv = previews / f"{rec.id}.png"                      # 1600 px thumb for lists
                     pv.write_bytes(_downscale(png, 1600))
                     rec.preview_path = get_storage().store(pv, "previews", f"{job.id}/{rec.id}.png")
+                    pf = previews / f"{rec.id}.full.png"                 # full render for the viewer
+                    pf.write_bytes(png)
+                    rec.preview_full_path = get_storage().store(pf, "previews", f"{job.id}/{rec.id}.full.png")
+                    del png
                 except Exception as exc:  # noqa: BLE001
                     rec.processing_notes.append(f"preview failed: {exc}")
                     self._note(job, f"{rec.file_name}: preview could not be rendered ({str(exc)[:100]})")

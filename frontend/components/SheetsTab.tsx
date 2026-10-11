@@ -7,6 +7,7 @@ import { formatInt, humanize } from "@/lib/format";
 import type { Module, SheetRecord } from "@/lib/types";
 import { cn, errorMessage } from "@/lib/utils";
 import { ConfidenceBadge } from "./ConfidenceBadge";
+import { PreviewLightbox } from "./PreviewLightbox";
 import { Alert } from "./ui/Alert";
 import { Badge, Chip } from "./ui/Badge";
 import { Button } from "./ui/Button";
@@ -16,6 +17,8 @@ import { Skeleton } from "./ui/Skeleton";
 export function SheetsTab({ jobId, module, refreshKey }: { jobId: string; module: Module; refreshKey?: string | number }) {
   const [sheets, setSheets] = useState<SheetRecord[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // Sheet open in the lightbox; prev / next move through the sheets that have a preview.
+  const [openId, setOpenId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setError(null);
@@ -63,23 +66,36 @@ export function SheetsTab({ jobId, module, refreshKey }: { jobId: string; module
     );
   }
 
+  const previewable = sheets.filter((s) => !!s.preview_path);
+  const openIndex = previewable.findIndex((s) => s.id === openId);
+
   return (
-    <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-      {sheets.map((s) => (
-        <SheetCard key={s.id} sheet={s} module={module} />
-      ))}
-    </div>
+    <>
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+        {sheets.map((s) => (
+          <SheetCard key={s.id} sheet={s} module={module} onOpen={() => setOpenId(s.id)} />
+        ))}
+      </div>
+      <PreviewLightbox
+        jobId={jobId}
+        sheets={previewable}
+        index={Math.max(0, openIndex)}
+        open={openIndex >= 0}
+        onClose={() => setOpenId(null)}
+        onIndexChange={(i) => setOpenId(previewable[i]?.id ?? null)}
+      />
+    </>
   );
 }
 
-function SheetCard({ sheet, module }: { sheet: SheetRecord; module: Module }) {
+function SheetCard({ sheet, module, onOpen }: { sheet: SheetRecord; module: Module; onOpen: () => void }) {
   const c = sheet.classification;
   // Measurement sheets are quantity take-offs, so they share the BOQ relevance flag.
   const relevant = module === "structural" ? c.relevant_for_bbs : c.relevant_for_boq;
   const relevantLabel = module === "structural" ? "BBS relevant" : module === "fitout" ? "BOQ relevant" : "Measured";
   return (
     <article className="card flex flex-col overflow-hidden">
-      <SheetPreview jobId={sheet.job_id} sheetId={sheet.id} hasPreview={!!sheet.preview_path} alt={`${sheet.file_name} page ${sheet.page_no}`} />
+      <SheetPreview jobId={sheet.job_id} sheetId={sheet.id} hasPreview={!!sheet.preview_path} alt={`${sheet.file_name} page ${sheet.page_no}`} onOpen={onOpen} />
       <div className="flex flex-1 flex-col gap-3 p-4">
         <div className="flex items-start justify-between gap-2">
           <div className="min-w-0">
@@ -127,10 +143,9 @@ function SheetCard({ sheet, module }: { sheet: SheetRecord; module: Module }) {
   );
 }
 
-function SheetPreview({ jobId, sheetId, hasPreview, alt }: { jobId: string; sheetId: string; hasPreview: boolean; alt: string }) {
+function SheetPreview({ jobId, sheetId, hasPreview, alt, onOpen }: { jobId: string; sheetId: string; hasPreview: boolean; alt: string; onOpen: () => void }) {
   const [url, setUrl] = useState<string | null>(null);
   const [failed, setFailed] = useState(false);
-  const [open, setOpen] = useState(false);
 
   useEffect(() => {
     if (!hasPreview) return;
@@ -154,37 +169,31 @@ function SheetPreview({ jobId, sheetId, hasPreview, alt }: { jobId: string; shee
     };
   }, [jobId, sheetId, hasPreview]);
 
-  useEffect(() => {
-    if (!open) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setOpen(false);
-    };
-    document.addEventListener("keydown", onKey);
-    return () => document.removeEventListener("keydown", onKey);
-  }, [open]);
+  if (url) {
+    return (
+      <button
+        type="button"
+        onClick={onOpen}
+        title="Open full-size preview"
+        className="relative block aspect-[4/3] w-full cursor-zoom-in overflow-hidden border-b border-line bg-white focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-brand"
+      >
+        {/* Blob URLs cannot go through next/image's optimizer. */}
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={url} alt={alt} className="size-full object-contain" />
+      </button>
+    );
+  }
 
   return (
-    <>
-      <div className={cn("relative aspect-[4/3] w-full overflow-hidden border-b border-line bg-surface-2", url && "cursor-zoom-in")} onClick={() => url && setOpen(true)}>
-        {url ? (
-          // Blob URLs cannot go through next/image's optimizer.
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={url} alt={alt} className="size-full object-contain" />
-        ) : failed || !hasPreview ? (
-          <div className="flex size-full flex-col items-center justify-center gap-2 text-muted">
-            <ImageIcon className="size-6" />
-            <span className="text-[12px]">{hasPreview ? "Preview unavailable" : "No preview"}</span>
-          </div>
-        ) : (
-          <Skeleton className="size-full rounded-none" />
-        )}
-      </div>
-      {open && url ? (
-        <div className="fixed inset-0 z-[85] flex items-center justify-center bg-ink/80 p-4 animate-fade-in" onClick={() => setOpen(false)} role="dialog" aria-modal="true" aria-label={alt}>
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={url} alt={alt} className="max-h-full max-w-full rounded-lg bg-white object-contain shadow-modal" />
+    <div className={cn("relative aspect-[4/3] w-full overflow-hidden border-b border-line bg-surface-2")}>
+      {failed || !hasPreview ? (
+        <div className="flex size-full flex-col items-center justify-center gap-2 text-muted">
+          <ImageIcon className="size-6" />
+          <span className="text-[12px]">{hasPreview ? "Preview unavailable" : "No preview"}</span>
         </div>
-      ) : null}
-    </>
+      ) : (
+        <Skeleton className="size-full rounded-none" />
+      )}
+    </div>
   );
 }

@@ -176,3 +176,15 @@ interface RoomBreakdown {
 ```
 
 `GET /api/v1/jobs/{id}` recomputes the breakdown on read for results saved before this field existed.
+
+
+### Sheet previews: thumb and full resolution (1.2.1)
+
+`SheetRecord.preview_full_path?: string | null` is set when a full-resolution render (long edge up to
+`PREVIEW_FULL_MAX_PX`, default 4500 px) was kept next to the 1600 px thumb.
+
+`GET /api/v1/jobs/{id}/sheets/{sid}/preview?size=thumb|full` — `thumb` (default) returns the 1600 px
+image, `full` returns the full-resolution PNG when it exists and otherwise falls back to the thumb (never
+404 just because the job predates full renders). Response carries `Cache-Control: private, max-age=3600`.
+The job page shows the first sheet in a "Drawing preview" card above the pipeline; clicking opens a
+lightbox that requests `size=full` and supports zoom (wheel, buttons, fit, 100 %) and pan.

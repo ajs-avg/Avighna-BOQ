@@ -454,6 +454,7 @@ class SheetRecord(BaseModel):
     layout: str = "Model"
     classification: SheetClassification
     preview_path: Optional[str] = None
+    preview_full_path: Optional[str] = Field(None, description="Full-resolution render (viewer); thumb is preview_path")
     text_count: int = 0
     width: float = 0
     height: float = 0

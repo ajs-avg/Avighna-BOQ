@@ -125,6 +125,14 @@ def test_structural_job_synthetic(client, admin_token, tmp_path):
     assert len(sheets) == 1 and sheets[0]["classification"]["discipline"] == "structural"
     pv = client.get(f"/api/v1/jobs/{job['id']}/sheets/{sheets[0]['id']}/preview", headers=_h(admin_token))
     assert pv.status_code == 200 and pv.headers["content-type"] == "image/png"
+    # full-resolution render is kept next to the 1600 px thumb and served with ?size=full
+    assert sheets[0]["preview_full_path"]
+    full = client.get(f"/api/v1/jobs/{job['id']}/sheets/{sheets[0]['id']}/preview?size=full", headers=_h(admin_token))
+    assert full.status_code == 200 and len(full.content) >= len(pv.content)
+    import io
+    from PIL import Image
+    assert max(Image.open(io.BytesIO(full.content)).size) > max(Image.open(io.BytesIO(pv.content)).size)
+    assert client.get(f"/api/v1/jobs/{job['id']}/sheets/{sheets[0]['id']}/preview?size=huge", headers=_h(admin_token)).status_code == 422
 
 
 @pytest.mark.skipif(not REF_PDF.exists(), reason="reference PDF not on this machine")

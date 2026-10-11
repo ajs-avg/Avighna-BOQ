@@ -26,6 +26,7 @@ import { useUser } from "@/lib/user-context";
 import { cn, downloadBlob, errorMessage, slugify } from "@/lib/utils";
 import { PageHeader } from "./AppShell";
 import { ConfidenceBadge } from "./ConfidenceBadge";
+import { DrawingPreviewCard } from "./DrawingPreviewCard";
 import { ModuleBadge } from "./ModuleBadge";
 import { SendBackDialog } from "./SendBackDialog";
 import { SheetsTab } from "./SheetsTab";
@@ -416,6 +417,8 @@ export function JobDetail({ id }: { id: string }) {
         </div>
 
         <aside className="space-y-4">
+          <DrawingPreviewCard job={job} />
+
           <Card>
             <CardHeader title="Pipeline" description={processing ? "Live — updates automatically." : `${job.events.length} event${job.events.length === 1 ? "" : "s"}`} className="py-3" />
             <CardBody>

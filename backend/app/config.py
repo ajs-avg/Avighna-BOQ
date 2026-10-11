@@ -89,6 +89,8 @@ class Settings:
         self.max_pages: int = int(os.getenv("MAX_PAGES", "150"))  # per PDF; later pages are skipped with a note
         self.worker_threads: int = int(os.getenv("WORKER_THREADS", "2"))
         self.preview_dpi: int = int(os.getenv("PREVIEW_DPI", "110"))
+        # Full-resolution preview kept for the viewer (long edge, px); the AI image and the 1600 px thumb are derived from it
+        self.preview_full_max_px: int = int(os.getenv("PREVIEW_FULL_MAX_PX", "4500"))
 
         # First admin bootstrap: comma separated emails that are promoted to admin on first login
         self.bootstrap_admin_emails: List[str] = [

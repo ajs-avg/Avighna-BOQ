@@ -75,7 +75,7 @@
     <div class="sub">Drop a drawing. Get the measurement sheet, the BOQ abstract and the material requirement — in one Excel file.</div>
   </div>
   <div class="meta">
-    <div><b>Application version</b> 1.2.0 &nbsp;·&nbsp; <b>Document</b> Rev 2 &nbsp;·&nbsp; 11 October 2026</div>
+    <div><b>Application version</b> 1.2.1 &nbsp;·&nbsp; <b>Document</b> Rev 3 &nbsp;·&nbsp; 11 October 2026</div>
     <div><b>Avighna Group</b> · Internal tool</div>
   </div>
 </div>
@@ -216,13 +216,16 @@
   <tr><td><span class="pill green">Approved</span></td><td>A reviewer signed the job off. It is read-only until it is sent back.</td><td>—</td></tr>
   <tr><td><span class="pill red">Failed</span></td><td>Something stopped the job; the last pipeline message says what (e.g. "No sheets could be read"). Fix the input and <b>Reprocess</b>.</td><td>—</td></tr>
 </table>
+<h2>Drawing preview</h2>
+<p>Above the Pipeline panel the <b>Drawing preview</b> card shows the rendered sheet of the uploaded drawing (the first sheet, with a thumbnail strip when there are several). Click the image to open it full-screen in high resolution: zoom with the mouse wheel or the + / − buttons, drag to pan, <i>Fit</i> shows the whole sheet, <i>100%</i> shows it pixel for pixel, and <i>Download</i> saves the PNG. Use it to check the drawing against the elements without opening AutoCAD. Jobs processed before this feature show the standard-resolution image until they are reprocessed.</p>
+<div class="figure"><img src="14_preview_lightbox.png" alt="Drawing preview lightbox"><div class="cap">Figure 4 — The drawing preview opened full-screen, zoomed into the plan.</div></div>
 <div class="callout grey"><b>Messages you may see in the pipeline panel.</b> "preview could not be rendered" — the drawing was too heavy to draw within the time limit; the AI still reads the text and CAD facts. "AI reading failed … rooms taken from CAD outlines only" — the AI service did not answer; the fallback reads room names and door tags from the CAD file and shows rooms as equivalent squares at 50 % confidence — check them. "Room X: size missing, skipped" — no dimensions were found for that room; add them on the Elements tab.</div>
 
 <!-- ===================================================== 8 -->
 <div class="section"></div>
 <h1><span class="num">8</span>Step 4 — Check and correct the Elements</h1>
 <p class="lead">This is the most important screen. The measurement sheet, BOQ and materials are all computed from what is on this tab, so five minutes here decide the quality of the whole output.</p>
-<div class="figure"><img src="09_elements.png" alt="Elements tab"><div class="cap">Figure 4 — Elements tab: Assumptions card, then Rooms, Openings, Walls, Slabs, Columns &amp; beams and Other items. Each row shows its confidence; the "i" opens the evidence.</div></div>
+<div class="figure"><img src="09_elements.png" alt="Elements tab"><div class="cap">Figure 5 — Elements tab: Assumptions card, then Rooms, Openings, Walls, Slabs, Columns &amp; beams and Other items. Each row shows its confidence; the "i" opens the evidence.</div></div>
 <h2>What to check, in order</h2>
 <ol>
   <li><b>Assumptions</b> — floor height, wall thickness, slab thickness, construction type, concrete grade. These fill every blank on the drawing, so set them first.</li>
@@ -239,14 +242,14 @@
   <li>Nothing is saved until you press <b>Save &amp; recompute</b>. The button is grey until something changed. <b>Discard</b> throws the changes away.</li>
   <li>Saving sends the whole element list to the server, recomputes every tab and refreshes the Excel on the next download.</li>
 </ul>
-<div class="figure"><img src="10_edit_room_dialog.png" alt="Edit dialog"><div class="cap">Figure 5 — Editing a room. Finishes drive flooring, skirting, plaster and paint items; "wet area" adds waterproofing and dado.</div></div>
+<div class="figure"><img src="10_edit_room_dialog.png" alt="Edit dialog"><div class="cap">Figure 6 — Editing a room. Finishes drive flooring, skirting, plaster and paint items; "wet area" adds waterproofing and dado.</div></div>
 <div class="callout"><b>Rule of thumb.</b> If a value is on the drawing and the app got it wrong, correct it here — never in Excel. The Excel is regenerated from these elements, and a corrected element keeps the audit trail (who changed what, when).</div>
 
 <!-- ===================================================== 9 -->
 <div class="section"></div>
 <h1><span class="num">9</span>Step 5 — Read the Measurement Sheet</h1>
-<div class="figure"><img src="05_measurement_sheet.png" alt="Measurement sheet"><div class="cap">Figure 6 — Measurement Sheet tab: the sticky summary strip (items, totals per trade), warnings from the reading, then one card per item.</div></div>
-<div class="figure"><img src="06_measurement_sheet_block.png" alt="Measurement block"><div class="cap">Figure 7 — One item block. Each row is one object from the drawing. Grey rows with "−" are deductions; the red row is the block total that feeds the BOQ.</div></div>
+<div class="figure"><img src="05_measurement_sheet.png" alt="Measurement sheet"><div class="cap">Figure 7 — Measurement Sheet tab: the sticky summary strip (items, totals per trade), warnings from the reading, then one card per item.</div></div>
+<div class="figure"><img src="06_measurement_sheet_block.png" alt="Measurement block"><div class="cap">Figure 8 — One item block. Each row is one object from the drawing. Grey rows with "−" are deductions; the red row is the block total that feeds the BOQ.</div></div>
 <h2>How to read a block</h2>
 <table>
   <tr><th>Column</th><th>Meaning</th></tr>
@@ -261,13 +264,13 @@
 
 <!-- ===================================================== 10 -->
 <h1><span class="num">10</span>Step 6 — BOQ, Materials, Room-wise and Sheets tabs</h1>
-<div class="figure"><img src="07_boq.png" alt="BOQ tab"><div class="cap">Figure 8 — BOQ tab: one line per item, grouped by trade, with a basis badge. Quantities only; rates are left blank on purpose.</div></div>
+<div class="figure"><img src="07_boq.png" alt="BOQ tab"><div class="cap">Figure 9 — BOQ tab: one line per item, grouped by trade, with a basis badge. Quantities only; rates are left blank on purpose.</div></div>
 <p><b>BOQ</b> — the abstract. Item number, CPWD-style description, quantity, unit and basis. <span class="pill green">measured</span> means the quantity comes from measured drawing objects; <span class="pill amber">thumb rule</span> is used only for reinforcement steel and must be replaced by a bar bending schedule before tender.</p>
-<div class="figure"><img src="08_materials.png" alt="Materials tab"><div class="cap">Figure 9 — Materials tab: for each BOQ line the material, norm, wastage and required quantity; a summary by material at the end.</div></div>
+<div class="figure"><img src="08_materials.png" alt="Materials tab"><div class="cap">Figure 10 — Materials tab: for each BOQ line the material, norm, wastage and required quantity; a summary by material at the end.</div></div>
 <p><b>Materials</b> — for each BOQ line, the materials it consumes. Required = BOQ qty × norm × (1 + wastage %). The norms are company standards (Appendix B); an admin can tune them. The summary table at the bottom adds up each material across all items (e.g. total cement bags for plaster + flooring + masonry).</p>
-<div class="figure"><img src="13_roomwise.png" alt="Room-wise tab"><div class="cap">Figure 10 — Room-wise tab: one card per room with its work items, doors / windows and other items, and the materials for that room; a "Common / whole floor" card holds what is not tied to one room.</div></div>
+<div class="figure"><img src="13_roomwise.png" alt="Room-wise tab"><div class="cap">Figure 11 — Room-wise tab: one card per room with its work items, doors / windows and other items, and the materials for that room; a "Common / whole floor" card holds what is not tied to one room.</div></div>
 <p><b>Room-wise</b> — the same quantities regrouped by room, for clients and site teams who want to know what goes into each room. Pick a room from the selector or view all. Each card shows the room's size, area, perimeter and finishes, then three tables: <i>Work items</i> (this room's share of every BOQ item, e.g. its flooring, skirting, plaster, paint, dado, waterproofing), <i>Doors, windows &amp; other items</i> (with the count that falls in this room — a door type shared by several rooms is split between them), and <i>Materials for this room</i> (cement, sand, tiles, paint … computed from this room's items) with a summary by material. RCC walls, slabs, columns and beams, and anything marked "various" go to the <b>Common / whole floor</b> card at the end. Rooms plus common always add up to the Measurement Sheet totals.</p>
-<div class="figure"><img src="11_sheets.png" alt="Sheets tab"><div class="cap">Figure 11 — Sheets tab: every sheet read from the files with its preview, classification and processing notes.</div></div>
+<div class="figure"><img src="11_sheets.png" alt="Sheets tab"><div class="cap">Figure 12 — Sheets tab: every sheet read from the files with its preview, classification and processing notes.</div></div>
 <p><b>Sheets</b> — what the system saw: each file / page / layout, its preview image, the detected sheet type (floor plan, finishes plan, door schedule, elevation, …), units, drawing number, and processing notes. Use it to confirm that the right sheets were read and that previews rendered.</p>
 
 <!-- ===================================================== 11 -->
@@ -282,7 +285,7 @@
   <tr><td><b>Download Excel</b></td><td>Everyone</td><td>Available once the job is <i>Ready for review</i> or <i>Approved</i>. The file name carries the project, level and version.</td></tr>
 </table>
 <div class="callout grey"><b>Suggested workflow.</b> Engineer uploads and corrects elements → Reviewer checks the Elements tab against the drawing, reads the warnings, approves → Estimator downloads the Excel, fills rates in the BOQ tab → Site team uses the Tender vs Site tab during execution.</div>
-<div class="figure"><img src="04_jobs.png" alt="Jobs list"><div class="cap">Figure 12 — Jobs list: all jobs with status, result headline, owner and date. Filter by status.</div></div>
+<div class="figure"><img src="04_jobs.png" alt="Jobs list"><div class="cap">Figure 13 — Jobs list: all jobs with status, result headline, owner and date. Filter by status.</div></div>
 
 <!-- ===================================================== 12 -->
 <h1><span class="num">12</span>The Excel workbook, tab by tab</h1>
@@ -355,7 +358,7 @@
 
 <!-- ===================================================== 16 -->
 <h1><span class="num">16</span>Administrator guide</h1>
-<div class="figure"><img src="12_users.png" alt="Users page"><div class="cap">Figure 13 — Users page (admins only): invite, change role, reset password, deactivate; the audit log and system card are below.</div></div>
+<div class="figure"><img src="12_users.png" alt="Users page"><div class="cap">Figure 14 — Users page (admins only): invite, change role, reset password, deactivate; the audit log and system card are below.</div></div>
 <h2>Users</h2>
 <ul>
   <li><b>Invite</b> a user with name, e-mail and role. A temporary password is shown once — pass it on securely. The user must change it at first sign-in.</li>
@@ -521,6 +524,6 @@ tools/dev.sh</pre>
   <tr><td>Mivan</td><td>Aluminium-formwork construction where walls and slabs are cast in RCC monolithically.</td></tr>
   <tr><td>Tender vs Site</td><td>Comparison of the quantities estimated at tender with those measured on site during execution.</td></tr>
 </table>
-<p class="small muted" style="margin-top:14pt">Avighna BOQ · User &amp; Operations Guide · Rev 2 · 11 October 2026 · Internal document</p>
+<p class="small muted" style="margin-top:14pt">Avighna BOQ · User &amp; Operations Guide · Rev 3 · 11 October 2026 · Internal document</p>
 </body>
 </html>

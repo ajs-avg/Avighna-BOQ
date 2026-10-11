@@ -32,7 +32,7 @@ from app.models.schemas import (
 from app.engine.measurement import compute_measurement
 from app.pipeline import Pipeline, recalculate
 
-VERSION = "1.2.0"
+VERSION = "1.2.1"
 log = logging.getLogger("app")
 _member_adapter = TypeAdapter(MemberSpec)
 IN_FLIGHT = (JobStatus.queued, JobStatus.converting, JobStatus.analysing, JobStatus.extracting, JobStatus.quantifying)
@@ -354,12 +354,22 @@ def get_sheet_extraction(job_id: str, sheet_id: str, _: UserProfile = Depends(au
 
 
 @app.get("/api/v1/jobs/{job_id}/sheets/{sheet_id}/preview")
-def get_preview(job_id: str, sheet_id: str, _: UserProfile = Depends(auth.current_user)):
+def get_preview(job_id: str, sheet_id: str, size: str = Query("thumb", pattern="^(thumb|full)$"),
+                _: UserProfile = Depends(auth.current_user)):
+    """`size=thumb` (default) is the 1600 px image; `size=full` is the full-resolution render when the
+    job has one (falls back to the thumb for jobs processed before full renders were kept)."""
     sh = repo.get_sheet(job_id, sheet_id)
-    local = get_storage().resolve(sh.preview_path) if sh else None
+    if sh is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Preview not available")
+    stg = get_storage()
+    local = None
+    if size == "full" and sh.preview_full_path:
+        local = stg.resolve(sh.preview_full_path)
+    if local is None:
+        local = stg.resolve(sh.preview_path)
     if local is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Preview not available")
-    return FileResponse(str(local), media_type="image/png")
+    return FileResponse(str(local), media_type="image/png", headers={"Cache-Control": "private, max-age=3600"})
 
 
 def _recalc_and_save(job: JobRecord, user: UserProfile, what: str) -> JobRecord:

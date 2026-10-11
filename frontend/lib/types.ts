@@ -756,7 +756,10 @@ export interface SheetRecord {
   page_no: number;
   layout: string;
   classification: SheetClassification;
+  /** ~1600 px render served by `?size=thumb` (the default). */
   preview_path?: string | null;
+  /** Full-resolution render (up to ~4500 px) served by `?size=full`; null/absent on jobs processed before it existed. */
+  preview_full_path?: string | null;
   text_count: number;
   width: number;
   height: number;

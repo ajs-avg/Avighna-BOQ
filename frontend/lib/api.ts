@@ -258,10 +258,17 @@ export function createJob(
 export const getSheets = (jobId: string) =>
   apiFetch<SheetRecord[]>(`/api/v1/jobs/${encodeURIComponent(jobId)}/sheets`);
 
-/** Fetch a sheet preview PNG with the bearer token and return an object URL (caller revokes). */
-export async function getPreviewBlobUrl(jobId: string, sheetId: string): Promise<string> {
+/** `thumb` is the ~1600 px render; `full` is the high-resolution render when it exists (the API falls back to the thumb otherwise). */
+export type PreviewSize = "thumb" | "full";
+
+/**
+ * Fetch a sheet preview PNG with the bearer token and return an object URL (caller revokes).
+ * `size` defaults to the thumb so existing callers are unchanged; the lightbox asks for `full`.
+ */
+export async function getPreviewBlobUrl(jobId: string, sheetId: string, size: PreviewSize = "thumb"): Promise<string> {
+  const query = size === "full" ? "?size=full" : "";
   const res = await apiRequest(
-    `/api/v1/jobs/${encodeURIComponent(jobId)}/sheets/${encodeURIComponent(sheetId)}/preview`,
+    `/api/v1/jobs/${encodeURIComponent(jobId)}/sheets/${encodeURIComponent(sheetId)}/preview${query}`,
     { headers: { Accept: "image/png,image/*" } },
   );
   const blob = await res.blob();
