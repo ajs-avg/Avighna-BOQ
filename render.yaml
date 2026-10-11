@@ -1,0 +1,43 @@
+# Render Blueprint — deploys the backend as a Docker web service.
+# Frontend goes to Vercel (root directory: frontend), database + file storage to Supabase.
+services:
+  - type: web
+    name: avighna-boq-api
+    runtime: docker
+    region: singapore
+    plan: starter
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: .
+    healthCheckPath: /healthz
+    autoDeploy: true
+    envVars:
+      - key: DATABASE_URL            # Supabase > Project Settings > Database > Connection string (URI, session pooler)
+        sync: false
+      - key: SUPABASE_URL            # https://<project-ref>.supabase.co
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: STORAGE_BACKEND
+        value: supabase
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: GEMINI_MODEL_PRO
+        value: gemini-2.5-pro
+      - key: GEMINI_MODEL_FAST
+        value: gemini-2.5-flash
+      - key: JWT_SECRET
+        generateValue: true
+      - key: CORS_ORIGINS            # your Vercel URL(s), comma separated
+        value: https://avighna-boq.vercel.app
+      - key: BOOTSTRAP_ADMIN_EMAIL
+        value: admin@avighnagroup.com
+      - key: BOOTSTRAP_ADMIN_PASSWORD
+        sync: false
+      - key: WORKER_THREADS
+        value: "1"
+      - key: MAX_UPLOAD_MB
+        value: "200"
+      - key: DATA_DIR
+        value: /data
+      - key: APP_ENV
+        value: production

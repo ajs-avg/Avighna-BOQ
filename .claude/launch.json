@@ -1,0 +1,7 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    { "name": "web", "runtimeExecutable": "sh", "runtimeArgs": ["-c", "cd frontend && exec npm run dev"], "port": 3000 },
+    { "name": "api", "runtimeExecutable": "sh", "runtimeArgs": ["-c", "cd backend && exec ./run.sh"], "port": 8000 }
+  ]
+}

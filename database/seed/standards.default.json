@@ -1,0 +1,42 @@
+{
+  "ld_factor": 39.0,
+  "anchorage_extra_d": 10.0,
+  "cover_beam_mm": 30.0,
+  "cover_slab_mm": 20.0,
+  "cover_column_mm": 40.0,
+  "cover_wall_mm": 20.0,
+  "cover_stair_mm": 20.0,
+  "hook_length_d": 10.0,
+  "stirrup_corners": 5,
+  "bend_deduction_d": 0.6,
+  "min_straight_anchorage_m": 0.3,
+  "extra_bar_span_fraction": 0.3333333333333333,
+  "curtail_fraction": 0.1,
+  "end_zone_span_fraction": 0.3333333333333333,
+  "stirrup_end_offset_m": 0.05,
+  "slab_min_anchorage_m": 0.2,
+  "slab_bentup_factor": 0.42,
+  "slab_dist_end_fraction": 0.14285714285714285,
+  "slab_cont_edge_fraction": 0.3,
+  "sfr_min_depth_m": 0.75,
+  "unit_weight_kg_per_m": {
+    "6": 0.222,
+    "8": 0.395,
+    "10": 0.617,
+    "12": 0.888,
+    "16": 1.58,
+    "20": 2.47,
+    "25": 3.85,
+    "32": 6.31,
+    "40": 9.86
+  },
+  "diameters_in_summary": [
+    8,
+    10,
+    12,
+    16,
+    20,
+    25,
+    32
+  ]
+}

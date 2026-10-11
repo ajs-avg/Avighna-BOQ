@@ -1,0 +1,226 @@
+@import "tailwindcss";
+
+/* ---------------------------------------------------------------------------
+   Avighna BOQ — brand tokens (red & white)
+   --------------------------------------------------------------------------- */
+@theme {
+  --color-brand: #ed1c24;
+  --color-brand-dark: #c8102e;
+  --color-brand-soft: #fdeced;
+  --color-brand-tint: #fff5f5;
+  --color-ink: #231f20;
+  --color-muted: #6b6b70;
+  --color-line: #e6e6e9;
+  --color-line-strong: #d4d4d9;
+  --color-surface: #ffffff;
+  --color-surface-2: #f7f7f8;
+  --color-surface-3: #f0f0f2;
+  --color-success: #1f9d55;
+  --color-success-soft: #e8f6ee;
+  --color-warning: #d97706;
+  --color-warning-soft: #fef3e2;
+  --color-info: #2563eb;
+  --color-info-soft: #e8efff;
+  --color-danger: #ed1c24;
+  --color-danger-soft: #fdeced;
+
+  --radius-card: 12px;
+
+  --shadow-card: 0 1px 2px rgba(35, 31, 32, 0.04), 0 1px 3px rgba(35, 31, 32, 0.06);
+  --shadow-pop: 0 4px 6px -1px rgba(35, 31, 32, 0.08), 0 12px 24px -8px rgba(35, 31, 32, 0.16);
+  --shadow-modal: 0 24px 48px -12px rgba(35, 31, 32, 0.28);
+
+  --animate-fade-in: fade-in 160ms ease-out both;
+  --animate-pop-in: pop-in 180ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  --animate-slide-in-right: slide-in-right 220ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  --animate-slide-in-left: slide-in-left 220ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  --animate-shimmer: shimmer 1.6s linear infinite;
+  --animate-pulse-dot: pulse-dot 1.4s ease-in-out infinite;
+
+  @keyframes fade-in {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+  @keyframes pop-in {
+    from {
+      opacity: 0;
+      transform: translateY(6px) scale(0.98);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+    }
+  }
+  @keyframes slide-in-right {
+    from {
+      opacity: 0;
+      transform: translateX(16px);
+    }
+    to {
+      opacity: 1;
+      transform: translateX(0);
+    }
+  }
+  @keyframes slide-in-left {
+    from {
+      transform: translateX(-100%);
+    }
+    to {
+      transform: translateX(0);
+    }
+  }
+  @keyframes shimmer {
+    from {
+      background-position: -200% 0;
+    }
+    to {
+      background-position: 200% 0;
+    }
+  }
+  @keyframes pulse-dot {
+    0%,
+    100% {
+      opacity: 1;
+      transform: scale(1);
+    }
+    50% {
+      opacity: 0.45;
+      transform: scale(0.75);
+    }
+  }
+}
+
+@theme inline {
+  --font-sans:
+    var(--font-inter), ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial,
+    sans-serif;
+  --font-mono:
+    ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+}
+
+/* ---------------------------------------------------------------------------
+   Base
+   --------------------------------------------------------------------------- */
+@layer base {
+  html {
+    color-scheme: light;
+    -webkit-text-size-adjust: 100%;
+  }
+  body {
+    @apply bg-surface text-ink antialiased;
+    font-feature-settings: "cv11", "ss01", "tnum" 0;
+    font-size: 14px;
+    line-height: 1.5;
+  }
+  ::selection {
+    background: var(--color-brand-soft);
+    color: var(--color-ink);
+  }
+  * {
+    border-color: var(--color-line);
+  }
+  button,
+  [role="button"] {
+    cursor: pointer;
+  }
+  button:disabled,
+  [role="button"][aria-disabled="true"] {
+    cursor: not-allowed;
+  }
+  :focus-visible {
+    outline: 2px solid var(--color-brand);
+    outline-offset: 2px;
+  }
+  input[type="number"]::-webkit-inner-spin-button,
+  input[type="number"]::-webkit-outer-spin-button {
+    opacity: 1;
+  }
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: #d4d4d9;
+    border-radius: 999px;
+    border: 2px solid transparent;
+    background-clip: padding-box;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: #b9b9c0;
+    background-clip: padding-box;
+    border: 2px solid transparent;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+}
+
+/* ---------------------------------------------------------------------------
+   Component utilities
+   --------------------------------------------------------------------------- */
+@utility card {
+  @apply rounded-card border border-line bg-surface shadow-card;
+}
+
+@utility tnum {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1;
+}
+
+@utility skeleton {
+  @apply rounded-md bg-surface-3;
+  background-image: linear-gradient(90deg, #f0f0f2 0%, #fafafa 50%, #f0f0f2 100%);
+  background-size: 200% 100%;
+  animation: var(--animate-shimmer);
+}
+
+@utility scrollbar-thin {
+  scrollbar-width: thin;
+}
+
+@utility field {
+  @apply h-9 w-full rounded-lg border border-line bg-surface px-3 text-[13px] text-ink shadow-[inset_0_1px_1px_rgba(35,31,32,0.03)] transition-[border-color,box-shadow] placeholder:text-muted/70;
+}
+.field:hover:not(:disabled) {
+  border-color: var(--color-line-strong);
+}
+.field:focus {
+  outline: none;
+  border-color: var(--color-brand);
+  box-shadow: 0 0 0 3px rgba(237, 28, 36, 0.14);
+}
+.field:disabled,
+.field[readonly] {
+  background: var(--color-surface-2);
+  color: var(--color-muted);
+}
+.field[aria-invalid="true"] {
+  border-color: var(--color-danger);
+}
+
+/* Dense data tables */
+@utility table-dense {
+  @apply w-full border-collapse text-[13px];
+}
+.table-dense thead th {
+  @apply sticky top-0 z-10 border-b border-line bg-surface-2 px-3 py-2 text-left text-[11px] font-semibold uppercase tracking-[0.06em] text-muted whitespace-nowrap;
+}
+.table-dense tbody td {
+  @apply border-b border-line/70 px-3 py-2 align-middle text-ink;
+}
+.table-dense tbody tr:nth-child(even) > td {
+  background: rgba(247, 247, 248, 0.6);
+}
+.table-dense tbody tr.row-hover:hover > td {
+  background: var(--color-brand-tint);
+}
+.table-dense tfoot td {
+  @apply border-t border-line-strong bg-surface-2 px-3 py-2 text-[13px] font-semibold;
+}
+.table-dense .num {
+  @apply text-right tnum;
+}

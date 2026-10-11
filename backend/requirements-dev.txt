@@ -1,0 +1,3 @@
+-r requirements.txt
+pytest>=8
+pgserver>=0.1   # embedded PostgreSQL for tools/test_postgres.sh
