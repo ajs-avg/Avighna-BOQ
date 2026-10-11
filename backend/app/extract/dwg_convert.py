@@ -189,8 +189,30 @@ def sanitize_dxf(path: Path) -> bool:
     try:
         text = path.read_text(encoding="utf-8", errors="replace")
         path.write_text(_strip_dxf_objects(text), encoding="utf-8")
-        load_dxf_lenient(path)
-        return True
+        del text
+        doc = load_dxf_lenient(path)
     except Exception as exc:
         log.warning("DXF still unreadable after sanitising %s: %s", path.name, str(exc)[:120])
         return False
+    # If the file still needs ezdxf's slow recover mode, write it back once in clean form: every later
+    # load (inventory, geometry, the render subprocess) is then a plain read, 2-3x faster, and the
+    # layer-colour fix is persisted too.
+    try:
+        ezdxf.readfile(str(path))
+        return True
+    except Exception:
+        pass
+    try:
+        import os
+        tmp = path.with_suffix(".resave.dxf")
+        doc.saveas(str(tmp))
+        ezdxf.readfile(str(tmp))          # must be loadable the fast way, else keep the original
+        os.replace(str(tmp), str(path))
+        log.info("re-saved %s in clean DXF form for fast loading", path.name)
+    except Exception as exc:
+        log.info("re-save of %s skipped: %s", path.name, str(exc)[:100])
+        try:
+            path.with_suffix(".resave.dxf").unlink(missing_ok=True)
+        except OSError:
+            pass
+    return True

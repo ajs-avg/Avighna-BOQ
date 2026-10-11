@@ -54,7 +54,15 @@ def render(path: Path, layout_name: str, max_px: int, dpi: int) -> bytes:
         color_policy=ColorPolicy.BLACK,
     )
     backend = pymupdf_backend.PyMuPdfBackend()
-    Frontend(ctx, backend, config=cfg).draw_layout(layout, finalize=True)
+    try:
+        Frontend(ctx, backend, config=cfg).draw_layout(layout, finalize=True)
+    except Exception as exc:  # e.g. ezdxf FontNotFoundError on a server without system fonts
+        if "font" not in str(exc).lower() and "Font" not in type(exc).__name__:
+            raise
+        from ezdxf.addons.drawing.config import TextPolicy
+        print(f"text rendering unavailable ({exc}); drawing geometry only", file=sys.stderr)
+        backend = pymupdf_backend.PyMuPdfBackend()
+        Frontend(ctx, backend, config=cfg.with_changes(text_policy=TextPolicy.IGNORE)).draw_layout(layout, finalize=True)
     # Fixed paper size: never let the page auto-size to the drawing extents (a stray entity far
     # from the plan would otherwise demand a multi-gigapixel pixmap).
     width_mm, height_mm = 841.0, 594.0  # A1 landscape

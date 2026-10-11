@@ -16,7 +16,7 @@ RUN curl -fsSL https://ftp.gnu.org/gnu/libredwg/libredwg-0.13.4.tar.xz | tar -xJ
 FROM python:3.12-slim
 ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 PYTHONWARNINGS=ignore \
     DATA_DIR=/data DATABASE_DIR=/database STORAGE_BACKEND=supabase LIBREDWG_BIN=/usr/local/bin/dwg2dxf
-RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates curl \
+RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates curl fonts-dejavu-core fonts-liberation fontconfig\
     && rm -rf /var/lib/apt/lists/*
 COPY --from=libredwg /usr/local/bin/dwg2dxf /usr/local/bin/dwg2dxf
 RUN /usr/local/bin/dwg2dxf --version

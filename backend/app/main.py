@@ -32,7 +32,7 @@ from app.models.schemas import (
 from app.engine.measurement import compute_measurement
 from app.pipeline import Pipeline, recalculate
 
-VERSION = "1.2.2"
+VERSION = "1.2.3"
 log = logging.getLogger("app")
 _member_adapter = TypeAdapter(MemberSpec)
 IN_FLIGHT = (JobStatus.queued, JobStatus.converting, JobStatus.analysing, JobStatus.extracting, JobStatus.quantifying)
