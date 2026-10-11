@@ -261,7 +261,7 @@ function WorkItems({ items }: { items: RoomItemLine[] }) {
           <Table>
             <thead>
               <tr>
-                <th className="w-24">Item code</th>
+                <th className="w-40">Item code</th>
                 <th className="min-w-[320px]">Description</th>
                 <th className="num w-28">Qty</th>
                 <th className="w-16">Unit</th>
