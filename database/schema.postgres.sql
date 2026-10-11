@@ -56,3 +56,13 @@ CREATE TABLE IF NOT EXISTS schema_migrations (
     version TEXT PRIMARY KEY,
     applied_at TEXT NOT NULL
 );
+
+-- The backend connects as the table owner (postgres role), which bypasses RLS. Enabling RLS
+-- without policies simply blocks Supabase's public anon/authenticated API roles from reading
+-- these tables, which is what we want: all access goes through the backend API.
+ALTER TABLE users ENABLE ROW LEVEL SECURITY;
+ALTER TABLE jobs ENABLE ROW LEVEL SECURITY;
+ALTER TABLE sheets ENABLE ROW LEVEL SECURITY;
+ALTER TABLE settings ENABLE ROW LEVEL SECURITY;
+ALTER TABLE audit_log ENABLE ROW LEVEL SECURITY;
+ALTER TABLE schema_migrations ENABLE ROW LEVEL SECURITY;
