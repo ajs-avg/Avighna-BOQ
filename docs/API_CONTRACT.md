@@ -148,3 +148,31 @@ export interface JobSummaryRecord { id:string; module:Module; project_name:strin
 - `useUser()` context loads `GET /api/v1/me` on mount; on 401 clear storage and redirect to `/login`.
 - Logout: clear storage + cookie, go to `/login`.
 - No Supabase packages are used in this build; keep `lib/api.ts` as the single fetch layer.
+
+
+### Room-wise breakdown (added in 1.2.0)
+
+`MeasurementResult` carries, next to the blocks / BOQ / materials, a per-room view computed by the engine
+(no client arithmetic). Every `MeasurementRow` now has `room_id: string | null`; a room's share of an item is
+the sum of its rows, and rows with `room_id = null` form the common section. Rooms + common add up to the
+sheet totals exactly. Door / window rows are written per room when the schedule names several rooms
+("D06 — BOARDROOM, BOOTH, OFFICES ×6" becomes one row per matched room with its share of the count).
+
+```ts
+interface RoomItemLine    { item_code: string; item_title: string; trade: string; unit: string; qty: number }
+interface RoomOpeningLine { tag: string; kind: string; width_m: number; height_m: number; count: number; description: string }
+interface RoomMiscLine    { description: string; qty: number; unit: string; trade: string; tag: string }
+interface MaterialTotal   { material: string; required: number; unit: string }
+interface RoomBreakdown {
+  room_id: string | null;              // null = "Common / whole floor"
+  name: string; level: string;
+  length_m: number; width_m: number; height_m: number; area_m2: number; perimeter_m: number;
+  floor_finish: string; wall_finish: string; ceiling_finish: string; wet_area: boolean;
+  items: RoomItemLine[]; openings: RoomOpeningLine[]; misc: RoomMiscLine[];
+  materials: MaterialRow[]; material_totals: MaterialTotal[];
+  totals_by_trade: Record<string, Record<string, number>>;
+}
+// MeasurementResult += room_breakdown: RoomBreakdown[]; common_breakdown: RoomBreakdown | null
+```
+
+`GET /api/v1/jobs/{id}` recomputes the breakdown on read for results saved before this field existed.

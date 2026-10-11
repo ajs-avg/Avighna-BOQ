@@ -199,3 +199,36 @@ def test_openings_match_rooms_by_schedule_text() -> None:
     ded = [r for r in skirt.rows if r.deduction]
     assert len(ded) == 3 and sorted(r.nos for r in ded) == [-2.0, -2.0, -2.0]
     assert any("D05" in w and "RECEPTION" in w for w in res.warnings)
+
+
+def test_room_breakdown_adds_up_to_sheet_totals() -> None:
+    """Room-wise view: each room's share + common section == measurement-sheet totals, per item."""
+    from app.engine.measurement import compute_measurement
+    from app.models.schemas import MeasurementExtraction, MiscEl, OpeningEl, RoomEl, WallEl
+
+    rooms = [RoomEl(id="r1", name="BOARDROOM", length_m=5.49, width_m=6.26, height_m=2.85, floor_finish="carpet tile"),
+             RoomEl(id="r2", name="PANTRY", length_m=7.95, width_m=2.34, height_m=2.85, floor_finish="ceramic tile", wet_area=True, dado_height_m=2.1),
+             RoomEl(id="r3", name="SALES OFFICE", length_m=8.8, width_m=10.7, height_m=2.85, floor_finish="carpet tile")]
+    ops = [OpeningEl(id="o1", tag="D06", kind="door", width_m=1.0, height_m=2.7, count=6, room="BOARDROOM, OFFICES"),
+           OpeningEl(id="o2", tag="D07", kind="door", width_m=0.95, height_m=2.2, count=1, room="PANTRY"),
+           OpeningEl(id="o3", tag="D01", kind="door", width_m=2.0, height_m=2.7, count=1, room="MAIN ENTRANCE")]
+    walls = [WallEl(id="w1", tag="SW1", wall_type="rcc", length_m=30.2, thickness_m=0.2, height_m=2.85, count=1, room="Various")]
+    misc = [MiscEl(id="m1", tag="", description="Pantry counter", unit="LS", qty=1, trade="Joinery", room="PANTRY"),
+            MiscEl(id="m2", tag="DB", description="Distribution board", unit="nos", qty=1, trade="Electrical", room="Various")]
+    res = compute_measurement(MeasurementExtraction(rooms=rooms, openings=ops, walls=walls, misc=misc))
+    assert [b.name for b in res.room_breakdown] == ["BOARDROOM", "PANTRY", "SALES OFFICE"]
+    assert res.common_breakdown is not None
+    # per item: sum over rooms + common == block total
+    for b in res.blocks:
+        share = sum(it.qty for bd in res.room_breakdown + [res.common_breakdown] for it in bd.items if it.item_code == b.item_code)
+        assert abs(share - b.total) < 1e-6, (b.item_code, share, b.total)
+    pantry = next(bd for bd in res.room_breakdown if bd.name == "PANTRY")
+    codes = {it.item_code for it in pantry.items}
+    assert {"WP", "DADO", "SKIRT", "DOOR-D07"} <= codes and pantry.wet_area
+    assert [m.description for m in pantry.misc] == ["Pantry counter"]
+    assert pantry.material_totals and any(m.material == "Cement" for m in pantry.material_totals)
+    board = next(bd for bd in res.room_breakdown if bd.name == "BOARDROOM")
+    assert [(o.tag, o.count) for o in board.openings] == [("D06", 3.0)]  # 6 doors shared by 2 matched rooms
+    common_codes = {it.item_code for it in res.common_breakdown.items}
+    assert {"RCC-WALL", "FW-WALL", "DOOR-D01"} <= common_codes
+    assert [o.tag for o in res.common_breakdown.openings] == ["D01"] and [m.tag for m in res.common_breakdown.misc] == ["DB"]

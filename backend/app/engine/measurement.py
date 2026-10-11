@@ -11,6 +11,7 @@ from collections import OrderedDict
 from typing import Dict, List, Optional, Sequence, Tuple
 
 from app.models.schemas import (
+    MaterialTotal, RoomBreakdown, RoomItemLine, RoomMiscLine, RoomOpeningLine,
     BOQAbstractLine, MaterialRow, MeasurementBlock, MeasurementExtraction, MeasurementResult, MeasurementRow,
     OpeningEl, ProjectAssumptions, RoomEl,
 )
@@ -65,14 +66,16 @@ class _Block:
         self.seq = _SEQ[0]
 
     def add(self, location: str, nos: float, l: Optional[float], b: Optional[float], h: Optional[float],
-            rule: str = "", element_id: Optional[str] = None, qty: Optional[float] = None) -> None:
+            rule: str = "", element_id: Optional[str] = None, qty: Optional[float] = None,
+            room_id: Optional[str] = None) -> None:
         if qty is None:
             qty = nos
             for v in (l, b, h):
                 if v is not None:
                     qty *= v
         self.rows.append(MeasurementRow(sr=len(self.rows) + 1, location=location, nos=nos, l_m=l, b_m=b, h_m=h,
-                                        qty=r3(qty), deduction=qty < 0, rule=rule, element_id=element_id))
+                                        qty=r3(qty), deduction=qty < 0, rule=rule, element_id=element_id,
+                                        room_id=room_id))
 
     def total(self) -> float:
         return r3(sum(r.qty for r in self.rows))
@@ -118,6 +121,19 @@ def _match_rooms(openings: Sequence[OpeningEl], rooms: Sequence[RoomEl]) -> Dict
             shares = {r.id: o.count / n for r in matched}
         out[o.id] = {rid: c for rid, c in shares.items() if c > 0}
     return out
+
+
+def _find_room(text: str, rooms: Sequence[RoomEl], level: str = "") -> Optional[RoomEl]:
+    """Single room referenced by free text ('PANTRY', 'Living Room'); None when ambiguous or unknown."""
+    key = _norm(text)
+    if not key or key in ("various", "all", "common", "general", "-"):
+        return None
+    cands = [r for r in rooms if not r.level or not level or _norm(level) == _norm(r.level)]
+    exact = [r for r in cands if _norm(r.name) == key]
+    if len(exact) == 1:
+        return exact[0]
+    part = [r for r in cands if key in _norm(r.name) or _norm(r.name) in key]
+    return part[0] if len(part) == 1 else None
 
 
 def _room_openings(room: RoomEl, openings: Sequence[OpeningEl], shares: Dict[str, Dict[str, float]]) -> List[OpeningEl]:
@@ -246,84 +262,91 @@ def compute_measurement(ex: MeasurementExtraction, norms: Optional[Dict[str, lis
         fcode = "FLOOR-" + _norm(room.floor_finish).replace(" ", "-")[:40]
         fl = blk(fcode, f"Providing and laying {room.floor_finish}, on cement mortar bed, incl. grouting, cleaning and curing", "sqm", "Flooring")
         if room.area_m2:
-            fl.add(f"{where} floor ({size_lbl})", 1, None, None, None, "net between walls (IS 1200 Pt 11)", room.id, qty=area)
+            fl.add(f"{where} floor ({size_lbl})", 1, None, None, None, "net between walls (IS 1200 Pt 11)", room.id, qty=area, room_id=room.id)
         else:
-            fl.add(f"{where} floor", 1, room.length_m, room.width_m, None, "net between walls (IS 1200 Pt 11)", room.id)
+            fl.add(f"{where} floor", 1, room.length_m, room.width_m, None, "net between walls (IS 1200 Pt 11)", room.id, room_id=room.id)
 
         # skirting
         if room.skirting_mm > 0:
             sk = blk("SKIRT", f"Providing and fixing skirting {int(room.skirting_mm)} mm high to match flooring", "rmt", "Flooring")
-            sk.add(f"{where} perimeter", 1, perim, None, None, "2 x (L + B)" if not room.perimeter_m else "measured perimeter", room.id)
+            sk.add(f"{where} perimeter", 1, perim, None, None, "2 x (L + B)" if not room.perimeter_m else "measured perimeter", room.id, room_id=room.id)
             for o in ops:
                 if o.kind in ("door", "opening"):
-                    sk.add(f"Deduct: {_opening_label(o)} width", -o.count, o.width_m, None, None, "no skirting across doors", o.id)
+                    sk.add(f"Deduct: {_opening_label(o)} width", -o.count, o.width_m, None, None, "no skirting across doors", o.id, room_id=room.id)
 
         # wall plaster / paint base
         gross_wall = perim * H
         if room.plastered:
             pl = blk("PLASTER-INT", "Providing and applying 12 mm thick cement plaster 1:4 on internal walls, incl. scaffolding and curing", "sqm", "Plaster")
-            pl.add(f"{where} walls, perimeter x height", 1, perim, None, H, "gross (IS 1200 Pt 12)", room.id)
+            pl.add(f"{where} walls, perimeter x height", 1, perim, None, H, "gross (IS 1200 Pt 12)", room.id, room_id=room.id)
             for o in ops:
                 oa = o.width_m * o.height_m
                 faces, rule = _plaster_deduction_rule(oa)
                 if faces:
-                    pl.add(f"Deduct: {_opening_label(o)}", -o.count * faces, o.width_m, None, o.height_m, rule, o.id)
+                    pl.add(f"Deduct: {_opening_label(o)}", -o.count * faces, o.width_m, None, o.height_m, rule, o.id, room_id=room.id)
                 if faces == 2:
-                    pl.add(f"Add: jambs, sill & soffit of {o.tag}", o.count, 2 * o.height_m + o.width_m, a.wall_thickness_m, None, "reveals measured (Pt 12)", o.id)
+                    pl.add(f"Add: jambs, sill & soffit of {o.tag}", o.count, 2 * o.height_m + o.width_m, a.wall_thickness_m, None, "reveals measured (Pt 12)", o.id, room_id=room.id)
             cl = blk("PLASTER-CLG", "Providing and applying 6 mm thick cement plaster 1:3 on ceilings, incl. scaffolding and curing", "sqm", "Plaster")
             cl.add(f"{where} ceiling", 1, None if room.area_m2 else room.length_m, None if room.area_m2 else room.width_m, None, "ceiling separate item", room.id,
-                   qty=area if room.area_m2 else None)
+                   qty=area if room.area_m2 else None, room_id=room.id)
         # painting walls (same deductions as plaster rule)
         wf = room.wall_finish if re.search(r"putty|primer", room.wall_finish, re.I) else f"wall putty 2 coats + primer + {room.wall_finish}"
         pw = blk("PAINT-WALL", f"Providing and applying {wf} on internal walls", "sqm", "Painting") \
             if "tile" not in _norm(room.wall_finish) else None
         if pw is not None:
-            pw.add(f"{where} walls, perimeter x height", 1, perim, None, H, "painted area = plastered area (Pt 13)", room.id)
+            pw.add(f"{where} walls, perimeter x height", 1, perim, None, H, "painted area = plastered area (Pt 13)", room.id, room_id=room.id)
             for o in ops:
                 oa = o.width_m * o.height_m
                 faces, rule = _plaster_deduction_rule(oa)
                 if faces:
-                    pw.add(f"Deduct: {_opening_label(o)}", -o.count * faces, o.width_m, None, o.height_m, rule, o.id)
+                    pw.add(f"Deduct: {_opening_label(o)}", -o.count * faces, o.width_m, None, o.height_m, rule, o.id, room_id=room.id)
             if room.dado_height_m > 0:
-                pw.add(f"Deduct: dado zone {room.dado_height_m:.2f} m high", -1, perim, None, room.dado_height_m, "tiled zone not painted", room.id)
+                pw.add(f"Deduct: dado zone {room.dado_height_m:.2f} m high", -1, perim, None, room.dado_height_m, "tiled zone not painted", room.id, room_id=room.id)
         cf = room.ceiling_finish if re.search(r"putty|primer", room.ceiling_finish, re.I) else f"putty + primer + {room.ceiling_finish}"
         pc = blk("PAINT-CLG", f"Providing and applying {cf} on ceilings", "sqm", "Painting")
         if room.area_m2:
-            pc.add(f"{where} ceiling", 1, None, None, None, "", room.id, qty=area)
+            pc.add(f"{where} ceiling", 1, None, None, None, "", room.id, qty=area, room_id=room.id)
         else:
-            pc.add(f"{where} ceiling", 1, room.length_m, room.width_m, None, "", room.id)
+            pc.add(f"{where} ceiling", 1, room.length_m, room.width_m, None, "", room.id, room_id=room.id)
 
         # dado
         if room.dado_height_m > 0:
             dd = blk("DADO", f"Ceramic / vitrified wall tiles (dado) up to {room.dado_height_m:.2f} m height, incl. adhesive and grouting", "sqm", "Wall tiles")
-            dd.add(f"{where} walls, perimeter x dado height", 1, perim, None, room.dado_height_m, "IS 1200 Pt 11", room.id)
+            dd.add(f"{where} walls, perimeter x dado height", 1, perim, None, room.dado_height_m, "IS 1200 Pt 11", room.id, room_id=room.id)
             for o in ops:
                 hh = min(o.height_m, room.dado_height_m)
-                dd.add(f"Deduct: {_opening_label(o)} within dado", -o.count, o.width_m, None, hh, "", o.id)
+                dd.add(f"Deduct: {_opening_label(o)} within dado", -o.count, o.width_m, None, hh, "", o.id, room_id=room.id)
 
         # waterproofing
         if room.wet_area:
             wp = blk("WP", "Waterproofing treatment to wet areas (floor + 300 mm upturn) with approved system", "sqm", "Waterproofing")
-            wp.add(f"{where} floor", 1, None, None, None, "", room.id, qty=area)
-            wp.add(f"{where} upturn 300 mm on perimeter", 1, perim, None, 0.3, "", room.id)
+            wp.add(f"{where} floor", 1, None, None, None, "", room.id, qty=area, room_id=room.id)
+            wp.add(f"{where} upturn 300 mm on perimeter", 1, perim, None, 0.3, "", room.id, room_id=room.id)
 
     # ------------------------------------------------------------------ openings as items
     seen_tags: Dict[str, OpeningEl] = {}
+    rooms_by_id = {r.id: r for r in ex.rooms}
     for o in ex.openings:
+        shares = room_shares.get(o.id) or {}
+        places = [(rooms_by_id[rid].name, cnt, rid) for rid, cnt in shares.items() if rid in rooms_by_id] or [(o.room, o.count, None)]
         if o.kind in ("door", "opening"):
             key = f"DOOR-{o.tag.upper()}"
             d = blk(key, f"Supplying and fixing door {o.tag} {o.width_m:.2f} x {o.height_m:.2f} m: {o.description or 'flush door with frame, hardware and polish'}, complete", "nos", "Doors & Windows")
-            d.add(loc(f"{o.tag}", o.room, o.level), o.count, None, None, None, "door schedule", o.id)
+            for where_name, cnt, rid in places:
+                d.add(loc(f"{o.tag}", where_name, o.level), cnt, None, None, None, "door schedule", o.id, room_id=rid)
         elif o.kind in ("window", "ventilator"):
             key = f"WIN-{o.tag.upper()}"
             wn = blk(key, f"Providing and fixing {o.kind} {o.tag} {o.width_m:.2f} x {o.height_m:.2f} m: {o.description or 'powder-coated aluminium sliding window with glass and mesh'}", "sqm", "Doors & Windows")
-            wn.add(loc(f"{o.tag}", o.room, o.level), o.count, o.width_m, None, o.height_m, "window schedule", o.id)
+            for where_name, cnt, rid in places:
+                wn.add(loc(f"{o.tag}", where_name, o.level), cnt, o.width_m, None, o.height_m, "window schedule", o.id, room_id=rid)
 
     # ------------------------------------------------------------------ misc items (AI judgement)
     for i, m in enumerate(ex.misc, 1):
         code = f"MISC-{_norm(m.trade).replace(' ', '-')[:12]}-{i}"
         mb = blk(code, m.description, m.unit, m.trade or "Miscellaneous")
-        mb.add(loc(m.tag or m.description[:30], m.room, m.level), m.qty, None, None, None, "from drawing / schedule", m.id)
+        mr = _find_room(m.room, ex.rooms, m.level)
+        mb.add(loc(m.tag or m.description[:30], m.room, m.level), m.qty, None, None, None, "from drawing / schedule", m.id,
+               room_id=mr.id if mr else None)
 
     # ------------------------------------------------------------------ assemble
     ordered = sorted(blocks.values(), key=lambda b: (TRADE_ORDER.index(b.trade) if b.trade in TRADE_ORDER else 99, b.seq))
@@ -339,7 +362,67 @@ def compute_measurement(ex: MeasurementExtraction, norms: Optional[Dict[str, lis
     for b in ordered:
         if b.total() <= 0 and b.basis == "measured":
             warnings.append(f"{b.code}: total is zero or negative - check deductions")
-    return MeasurementResult(blocks=out_blocks, boq=boq, materials=materials, totals_by_trade=totals_by_trade, warnings=warnings)
+    rooms_bd, common_bd = build_room_breakdown(ex, out_blocks, room_shares, norms or DEFAULT_NORMS)
+    return MeasurementResult(blocks=out_blocks, boq=boq, materials=materials, totals_by_trade=totals_by_trade, warnings=warnings,
+                             room_breakdown=rooms_bd, common_breakdown=common_bd)
+
+
+def _breakdown_from_rows(name: str, room: Optional[RoomEl], blocks: Sequence[MeasurementBlock], rid: Optional[str],
+                         norms: Dict[str, list], a: ProjectAssumptions) -> RoomBreakdown:
+    items: List[RoomItemLine] = []
+    totals: Dict[str, Dict[str, float]] = {}
+    for b in blocks:
+        q = r3(sum(r.qty for r in b.rows if r.room_id == rid))
+        if abs(q) < 1e-9:
+            continue
+        items.append(RoomItemLine(item_code=b.item_code, item_title=b.item_title, trade=b.trade, unit=b.unit, qty=q))
+        totals.setdefault(b.trade, {})
+        totals[b.trade][b.unit] = r3(totals[b.trade].get(b.unit, 0.0) + q)
+    pseudo = [BOQAbstractLine(item_no=i, item_code=it.item_code, trade=it.trade, description=it.item_title, unit=it.unit,
+                              qty=it.qty, basis="measured") for i, it in enumerate(items, 1)]  # type: ignore[arg-type]
+    mats = compute_materials(pseudo, norms)
+    mt = [MaterialTotal(material=k, required=r3(v[0]), unit=v[1]) for k, v in material_totals(mats).items()]
+    if room is None:
+        return RoomBreakdown(room_id=None, name=name, items=items, materials=mats, material_totals=mt, totals_by_trade=totals)
+    area = room.area_m2 if room.area_m2 else r3(room.length_m * room.width_m)
+    perim = room.perimeter_m if room.perimeter_m else r3(2 * (room.length_m + room.width_m))
+    return RoomBreakdown(room_id=room.id, name=room.name, level=room.level, length_m=room.length_m, width_m=room.width_m,
+                         height_m=room.height_m or a.floor_height_m, area_m2=r3(area), perimeter_m=r3(perim),
+                         floor_finish=room.floor_finish, wall_finish=room.wall_finish, ceiling_finish=room.ceiling_finish,
+                         wet_area=room.wet_area, items=items, materials=mats, material_totals=mt, totals_by_trade=totals)
+
+
+def build_room_breakdown(ex: MeasurementExtraction, blocks: Sequence[MeasurementBlock],
+                         room_shares: Dict[str, Dict[str, float]], norms: Dict[str, list]
+                         ) -> Tuple[List[RoomBreakdown], Optional[RoomBreakdown]]:
+    """Room-wise view: every measurement row carries a room_id, so a room's share of each item is the
+    sum of its rows; what has no room (RCC, slabs, members, 'various' items) goes to the common section.
+    Sum of all rooms + common equals the measurement-sheet totals exactly."""
+    a = ex.assumptions
+    out: List[RoomBreakdown] = []
+    for room in ex.rooms:
+        bd = _breakdown_from_rows(room.name, room, blocks, room.id, norms, a)
+        for o in ex.openings:
+            cnt = (room_shares.get(o.id) or {}).get(room.id)
+            if cnt:
+                bd.openings.append(RoomOpeningLine(tag=o.tag, kind=o.kind, width_m=o.width_m, height_m=o.height_m,
+                                                   count=cnt, description=o.description or ""))
+        for m in ex.misc:
+            mr = _find_room(m.room, ex.rooms, m.level)
+            if mr is not None and mr.id == room.id:
+                bd.misc.append(RoomMiscLine(description=m.description, qty=m.qty, unit=m.unit, trade=m.trade or "Miscellaneous", tag=m.tag or ""))
+        out.append(bd)
+    common = _breakdown_from_rows("Common / whole floor", None, blocks, None, norms, a)
+    for o in ex.openings:
+        if not room_shares.get(o.id):
+            common.openings.append(RoomOpeningLine(tag=o.tag, kind=o.kind, width_m=o.width_m, height_m=o.height_m,
+                                                   count=o.count, description=o.description or ""))
+    for m in ex.misc:
+        if _find_room(m.room, ex.rooms, m.level) is None:
+            common.misc.append(RoomMiscLine(description=m.description, qty=m.qty, unit=m.unit, trade=m.trade or "Miscellaneous", tag=m.tag or ""))
+    if not (common.items or common.openings or common.misc):
+        return out, None
+    return out, common
 
 
 def _norms_for(code: str, norms: Dict[str, list]) -> list:

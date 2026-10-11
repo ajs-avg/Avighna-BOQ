@@ -75,7 +75,7 @@
     <div class="sub">Drop a drawing. Get the measurement sheet, the BOQ abstract and the material requirement — in one Excel file.</div>
   </div>
   <div class="meta">
-    <div><b>Application version</b> 1.1.0 &nbsp;·&nbsp; <b>Document</b> Rev 1 &nbsp;·&nbsp; 11 October 2026</div>
+    <div><b>Application version</b> 1.2.0 &nbsp;·&nbsp; <b>Document</b> Rev 2 &nbsp;·&nbsp; 11 October 2026</div>
     <div><b>Avighna Group</b> · Internal tool</div>
   </div>
 </div>
@@ -92,7 +92,7 @@
   <div><span class="n">7</span> Step 3 — Processing and job status</div>
   <div><span class="n">8</span> Step 4 — Check and correct the Elements</div>
   <div><span class="n">9</span> Step 5 — Read the Measurement Sheet</div>
-  <div><span class="n">10</span> Step 6 — BOQ, Materials and Sheets tabs</div>
+  <div><span class="n">10</span> Step 6 — BOQ, Materials, Room-wise and Sheets tabs</div>
   <div><span class="n">11</span> Step 7 — Review, approve, download</div>
   <div><span class="n">12</span> The Excel workbook, tab by tab</div>
   <div><span class="n">13</span> How quantities are calculated (rules)</div>
@@ -153,6 +153,7 @@
   <tr><td>Assumptions</td><td>Project-level defaults used when a value is not on the drawing: floor height, wall thickness, slab thickness, construction type (Mivan / conventional), concrete grade. Editable on the Elements tab.</td></tr>
   <tr><td>Confidence</td><td>How sure the reader is about an element, from 0 to 100 %. Anything the AI had to infer (e.g. a height not on the drawing) is marked low; anything you edit becomes 100 %.</td></tr>
   <tr><td>Evidence</td><td>A short note of where the value came from: the text on the drawing, the dimension line, the schedule row, or "edited by …".</td></tr>
+  <tr><td>Room-wise</td><td>The same quantities regrouped per room: each room's items, openings, other items and materials, plus a common section for whole-floor items.</td></tr>
   <tr><td>Measurement Sheet</td><td>The detailed take-off. Grouped by item (e.g. "12 mm internal plaster"). Each row is one object from the drawing with No. × L × B × H = Qty. Deductions (doors, windows) appear as minus rows. Each block ends with a total.</td></tr>
   <tr><td>BOQ (Abstract)</td><td>The summary: one line per item with a CPWD-style description, the total quantity (linked to the measurement sheet), the unit, and blank rate / amount columns.</td></tr>
   <tr><td>Material Requirement</td><td>For every BOQ line, the materials needed: BOQ quantity × consumption norm × (1 + wastage %). Summed per material at the bottom (e.g. total cement bags).</td></tr>
@@ -259,12 +260,14 @@
 <p>The summary strip shows the totals per trade (RCC in cum, Plaster / Flooring / Painting in sqm, Doors in nos, …). The amber box lists warnings from the reading — read them before trusting the numbers.</p>
 
 <!-- ===================================================== 10 -->
-<h1><span class="num">10</span>Step 6 — BOQ, Materials and Sheets tabs</h1>
+<h1><span class="num">10</span>Step 6 — BOQ, Materials, Room-wise and Sheets tabs</h1>
 <div class="figure"><img src="07_boq.png" alt="BOQ tab"><div class="cap">Figure 8 — BOQ tab: one line per item, grouped by trade, with a basis badge. Quantities only; rates are left blank on purpose.</div></div>
 <p><b>BOQ</b> — the abstract. Item number, CPWD-style description, quantity, unit and basis. <span class="pill green">measured</span> means the quantity comes from measured drawing objects; <span class="pill amber">thumb rule</span> is used only for reinforcement steel and must be replaced by a bar bending schedule before tender.</p>
 <div class="figure"><img src="08_materials.png" alt="Materials tab"><div class="cap">Figure 9 — Materials tab: for each BOQ line the material, norm, wastage and required quantity; a summary by material at the end.</div></div>
 <p><b>Materials</b> — for each BOQ line, the materials it consumes. Required = BOQ qty × norm × (1 + wastage %). The norms are company standards (Appendix B); an admin can tune them. The summary table at the bottom adds up each material across all items (e.g. total cement bags for plaster + flooring + masonry).</p>
-<div class="figure"><img src="11_sheets.png" alt="Sheets tab"><div class="cap">Figure 10 — Sheets tab: every sheet read from the files with its preview, classification and processing notes.</div></div>
+<div class="figure"><img src="13_roomwise.png" alt="Room-wise tab"><div class="cap">Figure 10 — Room-wise tab: one card per room with its work items, doors / windows and other items, and the materials for that room; a "Common / whole floor" card holds what is not tied to one room.</div></div>
+<p><b>Room-wise</b> — the same quantities regrouped by room, for clients and site teams who want to know what goes into each room. Pick a room from the selector or view all. Each card shows the room's size, area, perimeter and finishes, then three tables: <i>Work items</i> (this room's share of every BOQ item, e.g. its flooring, skirting, plaster, paint, dado, waterproofing), <i>Doors, windows &amp; other items</i> (with the count that falls in this room — a door type shared by several rooms is split between them), and <i>Materials for this room</i> (cement, sand, tiles, paint … computed from this room's items) with a summary by material. RCC walls, slabs, columns and beams, and anything marked "various" go to the <b>Common / whole floor</b> card at the end. Rooms plus common always add up to the Measurement Sheet totals.</p>
+<div class="figure"><img src="11_sheets.png" alt="Sheets tab"><div class="cap">Figure 11 — Sheets tab: every sheet read from the files with its preview, classification and processing notes.</div></div>
 <p><b>Sheets</b> — what the system saw: each file / page / layout, its preview image, the detected sheet type (floor plan, finishes plan, door schedule, elevation, …), units, drawing number, and processing notes. Use it to confirm that the right sheets were read and that previews rendered.</p>
 
 <!-- ===================================================== 11 -->
@@ -279,7 +282,7 @@
   <tr><td><b>Download Excel</b></td><td>Everyone</td><td>Available once the job is <i>Ready for review</i> or <i>Approved</i>. The file name carries the project, level and version.</td></tr>
 </table>
 <div class="callout grey"><b>Suggested workflow.</b> Engineer uploads and corrects elements → Reviewer checks the Elements tab against the drawing, reads the warnings, approves → Estimator downloads the Excel, fills rates in the BOQ tab → Site team uses the Tender vs Site tab during execution.</div>
-<div class="figure"><img src="04_jobs.png" alt="Jobs list"><div class="cap">Figure 11 — Jobs list: all jobs with status, result headline, owner and date. Filter by status.</div></div>
+<div class="figure"><img src="04_jobs.png" alt="Jobs list"><div class="cap">Figure 12 — Jobs list: all jobs with status, result headline, owner and date. Filter by status.</div></div>
 
 <!-- ===================================================== 12 -->
 <h1><span class="num">12</span>The Excel workbook, tab by tab</h1>
@@ -352,7 +355,7 @@
 
 <!-- ===================================================== 16 -->
 <h1><span class="num">16</span>Administrator guide</h1>
-<div class="figure"><img src="12_users.png" alt="Users page"><div class="cap">Figure 12 — Users page (admins only): invite, change role, reset password, deactivate; the audit log and system card are below.</div></div>
+<div class="figure"><img src="12_users.png" alt="Users page"><div class="cap">Figure 13 — Users page (admins only): invite, change role, reset password, deactivate; the audit log and system card are below.</div></div>
 <h2>Users</h2>
 <ul>
   <li><b>Invite</b> a user with name, e-mail and role. A temporary password is shown once — pass it on securely. The user must change it at first sign-in.</li>
@@ -518,6 +521,6 @@ tools/dev.sh</pre>
   <tr><td>Mivan</td><td>Aluminium-formwork construction where walls and slabs are cast in RCC monolithically.</td></tr>
   <tr><td>Tender vs Site</td><td>Comparison of the quantities estimated at tender with those measured on site during execution.</td></tr>
 </table>
-<p class="small muted" style="margin-top:14pt">Avighna BOQ · User &amp; Operations Guide · Rev 1 · 11 October 2026 · Internal document</p>
+<p class="small muted" style="margin-top:14pt">Avighna BOQ · User &amp; Operations Guide · Rev 2 · 11 October 2026 · Internal document</p>
 </body>
 </html>

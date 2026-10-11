@@ -181,6 +181,18 @@ export function qtyDigits(unit: string): number {
   return 2;
 }
 
+const NF_SHARE_COUNT = nf(3, 0);
+const NF_SHARE_MEASURE = nf(3, 2);
+
+/**
+ * A room's share of a measured item: whole counts stay whole, measured units keep the
+ * sheet's 2 dp, and a third decimal appears only when the share actually needs it.
+ */
+export function formatShareQty(value: number | null | undefined, unit: string): string {
+  if (value === null || value === undefined || !Number.isFinite(value)) return "—";
+  return qtyDigits(unit) === 0 ? NF_SHARE_COUNT.format(value) : NF_SHARE_MEASURE.format(value);
+}
+
 /** Measurement quantity with its unit, e.g. "11.63 cum" / "4 nos". */
 export function formatMeasure(qty: number | null | undefined, unit: string): string {
   if (qty === null || qty === undefined || !Number.isFinite(qty)) return "—";

@@ -37,6 +37,7 @@ import { ElementsTab } from "./measurement/ElementsTab";
 import { MaterialsTab } from "./measurement/MaterialsTab";
 import { MeasurementBOQTab } from "./measurement/MeasurementBOQTab";
 import { MeasurementSheetTab } from "./measurement/MeasurementSheetTab";
+import { RoomWiseTab } from "./measurement/RoomWiseTab";
 import { countElements, lowConfidenceCount } from "./measurement/elementForms";
 import { MemberTab } from "./structural/MemberTab";
 import { SummaryTable } from "./structural/SummaryTable";
@@ -53,7 +54,7 @@ import { StatusPill } from "./ui/StatusPill";
 import { Tabs, type TabItem } from "./ui/Tabs";
 import { useToast } from "./ui/Toast";
 
-type TabKey = "summary" | MemberKind | "sheets" | "boq" | "rooms" | "measure" | "materials" | "elements";
+type TabKey = "summary" | MemberKind | "sheets" | "boq" | "rooms" | "measure" | "materials" | "roomwise" | "elements";
 type Action = "reprocess" | "recalculate" | "approve" | "download";
 
 export function JobDetail({ id }: { id: string }) {
@@ -220,6 +221,7 @@ export function JobDetail({ id }: { id: string }) {
         { key: "measure", label: "Measurement Sheet", count: job.measurement?.blocks.length ?? 0 },
         { key: "boq", label: "BOQ", count: job.measurement?.boq.length ?? 0 },
         { key: "materials", label: "Materials", count: job.measurement?.materials.length ?? 0 },
+        { key: "roomwise", label: "Room-wise", count: job.measurement?.room_breakdown?.length ?? 0 },
         { key: "elements", label: "Elements", count: countElements(job.elements) },
         { key: "sheets", label: "Sheets", count: job.sheet_count },
       ]
@@ -380,6 +382,7 @@ export function JobDetail({ id }: { id: string }) {
           {isMeasurement && tab === "measure" ? job.measurement ? <MeasurementSheetTab measurement={job.measurement} /> : <PendingPanel job={job} /> : null}
           {isMeasurement && tab === "boq" ? job.measurement ? <MeasurementBOQTab boq={job.measurement.boq} /> : <PendingPanel job={job} /> : null}
           {isMeasurement && tab === "materials" ? job.measurement ? <MaterialsTab materials={job.measurement.materials} /> : <PendingPanel job={job} /> : null}
+          {isMeasurement && tab === "roomwise" ? job.measurement ? <RoomWiseTab measurement={job.measurement} /> : <PendingPanel job={job} /> : null}
           {isMeasurement && tab === "elements" ? (
             processing ? (
               <PendingPanel job={job} />

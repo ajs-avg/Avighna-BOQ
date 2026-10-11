@@ -736,6 +736,7 @@ class MeasurementRow(BaseModel):
     deduction: bool = False
     rule: str = Field("", description="IS 1200 rule / drawing reference")
     element_id: Optional[str] = None
+    room_id: Optional[str] = Field(None, description="Room this row belongs to (None = common / whole floor)")
 
 
 class MeasurementBlock(BaseModel):
@@ -771,12 +772,70 @@ class MaterialRow(BaseModel):
     basis: str = ""
 
 
+class RoomItemLine(BaseModel):
+    """One work item inside one room (or in the common section): the room's share of a BOQ item."""
+    item_code: str
+    item_title: str
+    trade: str
+    unit: str
+    qty: float
+
+
+class RoomOpeningLine(BaseModel):
+    tag: str
+    kind: str
+    width_m: float
+    height_m: float
+    count: float
+    description: str = ""
+
+
+class RoomMiscLine(BaseModel):
+    description: str
+    qty: float
+    unit: str
+    trade: str
+    tag: str = ""
+
+
+class MaterialTotal(BaseModel):
+    material: str
+    required: float
+    unit: str
+
+
+class RoomBreakdown(BaseModel):
+    """Everything that belongs to one room: size, finishes, its work items, openings, other items and the
+    materials those items need. `room_id` None = the common / whole-floor section (RCC, slabs, members,
+    items whose room is not known)."""
+    room_id: Optional[str] = None
+    name: str
+    level: str = ""
+    length_m: float = 0
+    width_m: float = 0
+    height_m: float = 0
+    area_m2: float = 0
+    perimeter_m: float = 0
+    floor_finish: str = ""
+    wall_finish: str = ""
+    ceiling_finish: str = ""
+    wet_area: bool = False
+    items: List[RoomItemLine] = Field(default_factory=list)
+    openings: List[RoomOpeningLine] = Field(default_factory=list)
+    misc: List[RoomMiscLine] = Field(default_factory=list)
+    materials: List[MaterialRow] = Field(default_factory=list)
+    material_totals: List[MaterialTotal] = Field(default_factory=list)
+    totals_by_trade: Dict[str, Dict[str, float]] = Field(default_factory=dict)
+
+
 class MeasurementResult(BaseModel):
     blocks: List[MeasurementBlock]
     boq: List[BOQAbstractLine]
     materials: List[MaterialRow]
     totals_by_trade: Dict[str, Dict[str, float]] = Field(default_factory=dict)
     warnings: List[str] = Field(default_factory=list)
+    room_breakdown: List[RoomBreakdown] = Field(default_factory=list, description="One entry per room")
+    common_breakdown: Optional[RoomBreakdown] = Field(None, description="Items not tied to one room (whole floor)")
 
 
 class ElementsUpdate(BaseModel):

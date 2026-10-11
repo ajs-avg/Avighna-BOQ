@@ -644,6 +644,71 @@ export interface MaterialRow {
   basis: string;
 }
 
+// ---- room-wise breakdown ---------------------------------------------------
+// Computed by the backend alongside the sheet: every room gets its own share of
+// each BOQ item, its openings / misc items and the materials derived from that
+// share. Items that belong to no single room (RCC, slabs, members, "various")
+// land in `common_breakdown`. Rooms + common add up to the sheet totals.
+
+/** A room's share of one BOQ item (qty in `unit`). */
+export interface RoomItemLine {
+  item_code: string;
+  item_title: string;
+  trade: string;
+  unit: string;
+  qty: number;
+}
+
+/** A door / window / opening inside the room, with the count that falls in this room. */
+export interface RoomOpeningLine {
+  tag: string;
+  kind: string;
+  width_m: number;
+  height_m: number;
+  count: number;
+  description: string;
+}
+
+/** Any other item recorded against the room (electrical points, fixtures, …). */
+export interface RoomMiscLine {
+  description: string;
+  qty: number;
+  unit: string;
+  trade: string;
+  tag: string;
+}
+
+/** Roll-up of `RoomBreakdown.materials` by material. */
+export interface MaterialTotal {
+  material: string;
+  required: number;
+  unit: string;
+}
+
+export interface RoomBreakdown {
+  /** null = the "Common / whole floor" section. */
+  room_id: string | null;
+  name: string;
+  level: string;
+  length_m: number;
+  width_m: number;
+  height_m: number;
+  area_m2: number;
+  perimeter_m: number;
+  floor_finish: string;
+  wall_finish: string;
+  ceiling_finish: string;
+  wet_area: boolean;
+  items: RoomItemLine[];
+  openings: RoomOpeningLine[];
+  misc: RoomMiscLine[];
+  /** Same shape as the Materials tab rows, computed from this room's items. */
+  materials: MaterialRow[];
+  material_totals: MaterialTotal[];
+  /** trade → unit → total for this room only. */
+  totals_by_trade: Record<string, Record<string, number>>;
+}
+
 export interface MeasurementResult {
   blocks: MeasurementBlock[];
   boq: BOQAbstractLine[];
@@ -651,6 +716,10 @@ export interface MeasurementResult {
   /** trade → unit → total, e.g. { RCC: { cum: 11.6 }, Painting: { sqm: 66 } } */
   totals_by_trade: Record<string, Record<string, number>>;
   warnings: string[];
+  /** One per room, in element order. Missing on results computed before the room-wise view existed. */
+  room_breakdown?: RoomBreakdown[] | null;
+  /** Items not tied to a single room; null when there are none (or on older results). */
+  common_breakdown?: RoomBreakdown | null;
 }
 
 // ---- jobs -----------------------------------------------------------------

@@ -29,9 +29,10 @@ from app.models.schemas import (
     ElementsUpdate, JobStatus, LoginRequest, MeasurementExtraction, MemberSpec, MemberUpdate, Module, RoleUpdate,
     SetPasswordRequest, SheetRecord, SourceFile, Standards, TokenResponse, UserProfile, new_id,
 )
+from app.engine.measurement import compute_measurement
 from app.pipeline import Pipeline, recalculate
 
-VERSION = "1.1.0"
+VERSION = "1.2.0"
 log = logging.getLogger("app")
 _member_adapter = TypeAdapter(MemberSpec)
 IN_FLIGHT = (JobStatus.queued, JobStatus.converting, JobStatus.analysing, JobStatus.extracting, JobStatus.quantifying)
@@ -320,7 +321,12 @@ def list_jobs(limit: int = Query(50, ge=1, le=200), offset: int = Query(0, ge=0)
 
 @app.get("/api/v1/jobs/{job_id}", response_model=JobRecord)
 def get_job(job_id: str, _: UserProfile = Depends(auth.current_user)) -> JobRecord:
-    return _load_job(job_id)
+    job = _load_job(job_id)
+    if (job.module == Module.measurement and job.measurement and job.elements and job.elements.rooms
+            and not job.measurement.room_breakdown):
+        # results saved before the room-wise view existed: recompute on read (cheap, deterministic, not saved)
+        job.measurement = compute_measurement(job.elements)
+    return job
 
 
 @app.get("/api/v1/jobs/{job_id}/sheets", response_model=List[SheetRecord])
