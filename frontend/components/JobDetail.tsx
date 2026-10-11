@@ -13,7 +13,7 @@ import {
   File as FileIcon,
   Layers,
   RefreshCw,
-  Sparkles,
+  Loader2,
   Undo2,
 } from "lucide-react";
 import Link from "next/link";
@@ -503,7 +503,7 @@ function PendingPanel({ job }: { job: JobRecord }) {
   return (
     <Card>
       <EmptyState
-        icon={processing ? <Sparkles /> : job.status === "failed" ? <AlertTriangle /> : <Layers />}
+        icon={processing ? <Loader2 className="animate-spin" /> : job.status === "failed" ? <AlertTriangle /> : <Layers />}
         title={processing ? `${STATUS_META[job.status].label}…` : job.status === "failed" ? "No result" : "No result yet"}
         description={
           processing

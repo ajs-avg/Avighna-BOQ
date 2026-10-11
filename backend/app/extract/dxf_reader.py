@@ -26,17 +26,13 @@ def load_dxf(path: Path) -> Drawing:
     key = f"{path}:{path.stat().st_mtime_ns}"
     if key in _DOC_CACHE:
         return _DOC_CACHE[key]
+    from app.extract.dwg_convert import load_dxf_lenient, sanitize_dxf
     try:
-        doc = ezdxf.readfile(str(path))
-    except ezdxf.DXFStructureError:
-        from app.extract.dwg_convert import sanitize_dxf
-        if sanitize_dxf(path):
-            doc = ezdxf.readfile(str(path))
-        else:
-            from ezdxf import recover
-            doc, auditor = recover.readfile(str(path))
-            if auditor.has_errors:
-                log.warning("DXF recovered with %d errors", len(auditor.errors))
+        doc = load_dxf_lenient(path)
+    except Exception:
+        if not sanitize_dxf(path):
+            raise
+        doc = load_dxf_lenient(path)
     # NOTE: no doc.audit() here - the auditor deletes INSERTs whose block definition was lost by
     # the DWG converter, and with them their ATTRIB texts (finish tags, view titles). Rendering
     # does its own cleanup in a subprocess (render_cli.py); bbox handles dangling inserts below.
@@ -238,7 +234,8 @@ def render_layout_png(path: Path, layout_name: str = "Model", max_px: int = 3000
     env.setdefault("PYTHONWARNINGS", "ignore")
     cmd = [sys.executable, "-m", "app.extract.render_cli", str(path), layout_name, str(out), str(max_px), str(dpi)]
     try:
-        proc = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout_s, env=env)
+        proc = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", errors="replace",
+                              timeout=timeout_s, env=env)
     except subprocess.TimeoutExpired:
         raise RuntimeError(f"render timed out after {timeout_s}s")
     if proc.returncode != 0 or not out.exists():

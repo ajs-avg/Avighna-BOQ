@@ -20,7 +20,7 @@ def render(path: Path, layout_name: str, max_px: int, dpi: int) -> bytes:
 
     try:
         doc = ezdxf.readfile(str(path))
-    except ezdxf.DXFStructureError:
+    except Exception:
         from ezdxf import recover
         doc, _ = recover.readfile(str(path))
     try:

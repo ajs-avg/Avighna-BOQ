@@ -10,7 +10,7 @@ import {
   Menu as MenuIcon,
   Plus,
   Sliders,
-  Sparkles,
+  Cpu,
   Upload,
   Users,
   X,
@@ -161,7 +161,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             </div>
             <div className="ml-auto flex items-center gap-2 sm:gap-3">
               {ai?.enabled ? (
-                <Badge tone="success" icon={<Sparkles />} className="hidden sm:inline-flex" title={ai.model_fast ? `${ai.provider} · ${ai.model_fast}` : ai.provider}>
+                <Badge tone="success" icon={<Cpu />} className="hidden sm:inline-flex" title={ai.model_fast ? `${ai.provider} · ${ai.model_fast}` : ai.provider}>
                   AI on
                 </Badge>
               ) : null}

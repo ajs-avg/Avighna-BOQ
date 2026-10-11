@@ -211,11 +211,8 @@ def measure_dxf(path: Path, inv: Optional[SheetInventory] = None) -> MeasuredFac
     import ezdxf
 
     facts = MeasuredFacts(source=path.name)
-    try:
-        doc = ezdxf.readfile(str(path))
-    except Exception:
-        from ezdxf import recover
-        doc, _ = recover.readfile(str(path))
+    from app.extract.dxf_reader import load_dxf
+    doc = load_dxf(path)
     units_code = int(doc.header.get("$INSUNITS", 0) or 0)
     scale = INSUNITS_TO_M.get(units_code)
     if scale is None:

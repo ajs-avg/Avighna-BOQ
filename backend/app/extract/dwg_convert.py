@@ -34,7 +34,9 @@ def converter_status() -> Dict[str, bool]:
 
 def _run(cmd: list, timeout: int) -> subprocess.CompletedProcess:
     log.info("running: %s", " ".join(str(c) for c in cmd))
-    return subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
+    # LibreDWG echoes raw strings from the DWG (layout names, texts) that are often not UTF-8;
+    # never let decoding its chatter crash the conversion.
+    return subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=timeout)
 
 
 def _oda_convert(src: Path, out_dir: Path, version: str = "ACAD2018") -> Optional[Path]:
@@ -140,18 +142,33 @@ def _strip_dxf_objects(text: str, types=_DROP_OBJECT_TYPES) -> str:
     return "\n".join(out)
 
 
+def load_dxf_lenient(path: Path):
+    """ezdxf document for a converted DXF: plain read, then recover mode (tolerates the loose
+    structure LibreDWG writes: dangling layout keys, bad sort tables, odd MTEXT versions)."""
+    import ezdxf
+    from ezdxf import recover
+    try:
+        return ezdxf.readfile(str(path))
+    except Exception as exc:  # DXFStructureError, KeyError on layouts, ...
+        log.info("plain DXF load failed for %s (%s); using recover mode", path.name, str(exc)[:80])
+    doc, auditor = recover.readfile(str(path))
+    if auditor.has_errors:
+        log.info("DXF %s recovered with %d errors / %d fixes", path.name, len(auditor.errors), len(auditor.fixes))
+    return doc
+
+
 def sanitize_dxf(path: Path) -> bool:
-    """Make a converted DXF loadable by ezdxf; returns True if it loads afterwards."""
+    """Make a converted DXF loadable; returns True if ezdxf can load it (plain or recover mode)."""
     import ezdxf
     try:
         ezdxf.readfile(str(path))
         return True
-    except Exception as exc:  # DXFStructureError and friends
+    except Exception as exc:
         log.info("sanitising %s (%s)", path.name, str(exc)[:80])
     try:
         text = path.read_text(encoding="utf-8", errors="replace")
         path.write_text(_strip_dxf_objects(text), encoding="utf-8")
-        ezdxf.readfile(str(path))
+        load_dxf_lenient(path)
         return True
     except Exception as exc:
         log.warning("DXF still unreadable after sanitising %s: %s", path.name, str(exc)[:120])
