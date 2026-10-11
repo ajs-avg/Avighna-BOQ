@@ -325,6 +325,7 @@ function LightboxPanel({ jobId, sheets, index, onClose, onIndexChange, thumbUrls
   }, [jobId, sheet.id, attempt]);
 
   const zoom = useZoomPan(viewportRef, full, onClose);
+  const { zoomBy, fit: zoomFit, actual: zoomActual } = zoom;
 
   // Scroll lock, keyboard, and focus management (restore focus to the opener on close).
   useEffect(() => {
@@ -356,17 +357,17 @@ function LightboxPanel({ jobId, sheets, index, onClose, onIndexChange, thumbUrls
           return;
         case "+":
         case "=":
-          if (!typing) zoom.zoomBy(1.25);
+          if (!typing) zoomBy(1.25);
           return;
         case "-":
         case "_":
-          if (!typing) zoom.zoomBy(0.8);
+          if (!typing) zoomBy(0.8);
           return;
         case "0":
-          if (!typing) zoom.fit();
+          if (!typing) zoomFit();
           return;
         case "1":
-          if (!typing) zoom.actual();
+          if (!typing) zoomActual();
           return;
         case "Tab": {
           // Keep Tab inside the panel.
@@ -394,7 +395,7 @@ function LightboxPanel({ jobId, sheets, index, onClose, onIndexChange, thumbUrls
     };
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
-  }, [goTo, onClose, safeIndex, zoom]);
+  }, [goTo, onClose, safeIndex, zoomBy, zoomFit, zoomActual]);
 
   const loading = !full && !error;
   const highRes = !!sheet.preview_full_path;

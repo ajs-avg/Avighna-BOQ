@@ -24,6 +24,8 @@ def memory_limit_mb() -> Optional[float]:
                     return round(val / 1e6, 0)
         except (OSError, ValueError):
             continue
+    if os.getenv("RENDER"):   # Render containers do not expose a cgroup limit; the free/starter plans have 512 MB
+        return 512.0
     try:
         pages, size = os.sysconf("SC_PHYS_PAGES"), os.sysconf("SC_PAGE_SIZE")
         if pages > 0 and size > 0:

@@ -32,7 +32,7 @@ from app.models.schemas import (
 from app.engine.measurement import compute_measurement
 from app.pipeline import Pipeline, recalculate
 
-VERSION = "1.2.1"
+VERSION = "1.2.2"
 log = logging.getLogger("app")
 _member_adapter = TypeAdapter(MemberSpec)
 IN_FLIGHT = (JobStatus.queued, JobStatus.converting, JobStatus.analysing, JobStatus.extracting, JobStatus.quantifying)
@@ -66,6 +66,16 @@ def _recover_in_flight_jobs() -> None:
         if it.status in IN_FLIGHT:
             job = repo.get_job(it.id)
             if job is None:
+                continue
+            restarts = sum(1 for e in job.events if e.message.startswith("Server restarted"))
+            if restarts >= 2:   # the same job took the server down twice: almost certainly out of memory
+                job.status, job.progress = JobStatus.failed, 0
+                job.error = ("Processing stopped: this drawing crashed the server twice (most likely out of memory). "
+                             "Upload a PDF plot or a lighter DXF export, split the drawing, or move the API to a "
+                             "bigger instance (2 GB recommended).")
+                job.events.append(JobEvent(at=datetime.utcnow(), status=JobStatus.failed, message=job.error, progress=0))
+                repo.save_job(job)
+                log.error("job %s marked failed after %d server restarts", job.id, restarts)
                 continue
             job.status, job.progress = JobStatus.queued, 0
             job.events.append(JobEvent(at=datetime.utcnow(), status=JobStatus.queued,
@@ -134,7 +144,7 @@ _throttle = _Throttle()
 def healthz() -> Dict[str, Any]:
     st = ai_status()
     return {"status": "ok", "version": VERSION, "converters": converter_status(), "ai": st.model_dump(),
-            "gemini_model": st.model_pro}
+            "gemini_model": st.model_pro, "memory_limit_mb": memory_limit_mb(), "max_dxf_mb": max_dxf_mb()}
 
 
 @app.get("/api/v1/system")

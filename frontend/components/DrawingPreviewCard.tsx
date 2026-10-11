@@ -20,22 +20,22 @@ function useThumbUrls(jobId: string, ids: string[]): { urls: Record<string, stri
   const [failed, setFailed] = useState<ReadonlySet<string>>(new Set());
   const urlsRef = useRef<Record<string, string>>({});
   const pending = useRef(new Set<string>());
+  const wantedRef = useRef(new Set<string>());
   const alive = useRef(true);
   const idsKey = ids.join("|");
 
   useEffect(() => {
     alive.current = true;
-    const inflight = pending.current;
     return () => {
       alive.current = false;
       for (const u of Object.values(urlsRef.current)) URL.revokeObjectURL(u);
       urlsRef.current = {};
-      inflight.clear();
     };
   }, [jobId]);
 
   useEffect(() => {
     const wanted = new Set(idsKey ? idsKey.split("|") : []);
+    wantedRef.current = wanted;
     // Drop URLs for sheets that no longer exist.
     let changed = false;
     for (const id of Object.keys(urlsRef.current)) {
@@ -53,7 +53,8 @@ function useThumbUrls(jobId: string, ids: string[]): { urls: Record<string, stri
       getPreviewBlobUrl(jobId, id, "thumb")
         .then((u) => {
           pending.current.delete(id);
-          if (!alive.current) {
+          // Discard a late result if we unmounted, the sheet went away, or a duplicate request already landed.
+          if (!alive.current || !wantedRef.current.has(id) || urlsRef.current[id]) {
             URL.revokeObjectURL(u);
             return;
           }

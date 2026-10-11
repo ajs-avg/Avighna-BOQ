@@ -41,3 +41,5 @@ services:
         value: /data
       - key: APP_ENV
         value: production
+      - key: MEMORY_LIMIT_MB        # RAM of this instance in MB: 512 on free/starter, 2048 on Standard. Drives the 'DXF too big' guard.
+        value: "512"
