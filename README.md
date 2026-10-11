@@ -20,6 +20,10 @@ measurement engine (IS 1200 rules, formwork contact areas, steel thumb rules, ma
 the elements in the UI, recompute, and approve before the Excel is released. The earlier structural BBS and
 KR-style fit-out BOQ engines are still in the API for old jobs but are not offered for new ones.
 
+## User guide
+The full user & operations guide (roles, step-by-step, Excel tabs, measurement rules, admin, troubleshooting) is in
+[docs/Avighna_BOQ_User_Guide.pdf](docs/Avighna_BOQ_User_Guide.pdf) (source: `docs/guide-src/`).
+
 ## Repository
 ```
 frontend/   Next.js 15 web app (React 19, Tailwind v4)

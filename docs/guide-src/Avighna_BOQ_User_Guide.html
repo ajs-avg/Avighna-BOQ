@@ -1,0 +1,523 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Avighna BOQ — User &amp; Operations Guide</title>
+<style>
+  @page { size: A4; margin: 18mm 16mm 20mm 16mm; }
+  :root { --red: #ED1C24; --red-dark: #B8101A; --ink: #1F1F1F; --muted: #5F6368; --line: #E3E5E8; --soft: #FDECEC; --grey: #F5F6F7; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body { font-family: -apple-system, "Segoe UI", Inter, Helvetica, Arial, sans-serif; color: var(--ink); font-size: 10.6pt; line-height: 1.5; }
+  h1 { font-size: 22pt; color: var(--red); margin: 0 0 6pt; letter-spacing: -0.01em; }
+  h1 .num { color: var(--muted); font-weight: 600; margin-right: 8pt; }
+  h2 { font-size: 14pt; margin: 18pt 0 6pt; color: var(--ink); border-left: 4px solid var(--red); padding-left: 8pt; }
+  h3 { font-size: 11.5pt; margin: 12pt 0 4pt; }
+  p { margin: 0 0 7pt; }
+  ul, ol { margin: 0 0 8pt 18pt; padding: 0; }
+  li { margin-bottom: 3pt; }
+  .lead { font-size: 11.5pt; color: #333; }
+  .muted { color: var(--muted); }
+  .section { page-break-before: always; }
+  .avoid { page-break-inside: avoid; }
+  table { width: 100%; border-collapse: collapse; margin: 6pt 0 10pt; font-size: 9.6pt; page-break-inside: auto; }
+  th, td { border: 1px solid var(--line); padding: 5pt 6pt; vertical-align: top; text-align: left; }
+  th { background: var(--grey); font-weight: 700; }
+  tr { page-break-inside: avoid; }
+  td.c, th.c { text-align: center; }
+  td.r, th.r { text-align: right; }
+  code, .code { font-family: "SF Mono", Menlo, Consolas, monospace; font-size: 9pt; background: var(--grey); padding: 1pt 4pt; border-radius: 3px; }
+  pre { font-family: "SF Mono", Menlo, Consolas, monospace; font-size: 8.8pt; background: var(--grey); border: 1px solid var(--line); padding: 8pt; border-radius: 4px; white-space: pre-wrap; }
+  .callout { border: 1px solid #F3B9BC; background: var(--soft); border-radius: 6px; padding: 8pt 10pt; margin: 8pt 0 10pt; page-break-inside: avoid; }
+  .callout.grey { border-color: var(--line); background: var(--grey); }
+  .callout b:first-child { color: var(--red-dark); }
+  .figure { margin: 8pt 0 12pt; page-break-inside: avoid; }
+  .figure img { width: 100%; border: 1px solid var(--line); border-radius: 6px; display: block; }
+  .figure .cap { font-size: 9pt; color: var(--muted); margin-top: 4pt; }
+  .figure.half img { width: 70%; margin: 0 auto; }
+  .flow { display: flex; align-items: stretch; gap: 6pt; margin: 10pt 0 12pt; page-break-inside: avoid; }
+  .flow .step { flex: 1; border: 1px solid var(--line); border-top: 3px solid var(--red); border-radius: 6px; padding: 7pt 8pt; font-size: 9.4pt; }
+  .flow .step b { display: block; font-size: 10.2pt; margin-bottom: 2pt; }
+  .flow .arrow { align-self: center; color: var(--red); font-weight: 700; font-size: 14pt; }
+  .pill { display: inline-block; border-radius: 999px; padding: 1pt 7pt; font-size: 8.8pt; font-weight: 600; border: 1px solid var(--line); background: #fff; }
+  .pill.red { background: var(--soft); border-color: #F3B9BC; color: var(--red-dark); }
+  .pill.green { background: #E8F5EC; border-color: #BFE3C8; color: #1E7A3A; }
+  .pill.amber { background: #FFF4DF; border-color: #F5D9A6; color: #8A5A00; }
+  .pill.grey { background: var(--grey); color: #444; }
+  /* cover */
+  .cover { height: 257mm; display: flex; flex-direction: column; justify-content: space-between; page-break-after: always; }
+  .cover .band { background: linear-gradient(135deg, #ED1C24 0%, #C8121A 100%); color: #fff; border-radius: 10px; padding: 26mm 20mm; height: 150mm; display: flex; flex-direction: column; justify-content: flex-end; }
+  .cover .brand { display: flex; align-items: center; gap: 10pt; margin-bottom: auto; }
+  .cover .brand .logo { background: #fff; border-radius: 6px; padding: 6pt 10pt; display: inline-flex; align-items: center; gap: 6pt; color: #231F20; font-weight: 800; letter-spacing: 0.08em; font-size: 14pt; }
+  .cover .brand .logo img { height: 20pt; }
+  .cover .brand .chip { background: rgba(255,255,255,0.18); border: 1px solid rgba(255,255,255,0.5); border-radius: 4px; padding: 2pt 7pt; font-size: 9pt; font-weight: 700; letter-spacing: 0.1em; }
+  .cover h1.title { color: #fff; font-size: 34pt; line-height: 1.1; margin: 0 0 10pt; }
+  .cover .sub { font-size: 14pt; color: rgba(255,255,255,0.92); max-width: 130mm; }
+  .cover .meta { display: flex; justify-content: space-between; align-items: flex-end; padding: 0 4mm; color: var(--muted); font-size: 9.5pt; }
+  .cover .meta b { color: var(--ink); }
+  .toc { columns: 2; column-gap: 24pt; font-size: 10pt; }
+  .toc div { break-inside: avoid; padding: 2pt 0; border-bottom: 1px dotted var(--line); }
+  .toc .n { display: inline-block; width: 18pt; color: var(--red); font-weight: 700; }
+  .kv td:first-child { width: 32%; font-weight: 600; background: #FAFAFA; }
+  .small { font-size: 9pt; }
+</style>
+</head>
+<body>
+
+<!-- ===================================================== COVER -->
+<div class="cover">
+  <div class="band">
+    <div class="brand">
+      <span class="logo"><img src="../../frontend/public/brand/avighna-mark.png" alt="">AVIGHNA</span>
+      <span class="chip">BOQ</span>
+    </div>
+    <h1 class="title">Avighna BOQ<br>User &amp; Operations Guide</h1>
+    <div class="sub">Drop a drawing. Get the measurement sheet, the BOQ abstract and the material requirement — in one Excel file.</div>
+  </div>
+  <div class="meta">
+    <div><b>Application version</b> 1.1.0 &nbsp;·&nbsp; <b>Document</b> Rev 1 &nbsp;·&nbsp; 11 October 2026</div>
+    <div><b>Avighna Group</b> · Internal tool</div>
+  </div>
+</div>
+
+<!-- ===================================================== CONTENTS -->
+<h1>Contents</h1>
+<div class="toc">
+  <div><span class="n">1</span> What the application does</div>
+  <div><span class="n">2</span> Who uses it — roles</div>
+  <div><span class="n">3</span> Key terms, explained simply</div>
+  <div><span class="n">4</span> Quick start in 6 steps</div>
+  <div><span class="n">5</span> Step 1 — Sign in</div>
+  <div><span class="n">6</span> Step 2 — Create a new measurement</div>
+  <div><span class="n">7</span> Step 3 — Processing and job status</div>
+  <div><span class="n">8</span> Step 4 — Check and correct the Elements</div>
+  <div><span class="n">9</span> Step 5 — Read the Measurement Sheet</div>
+  <div><span class="n">10</span> Step 6 — BOQ, Materials and Sheets tabs</div>
+  <div><span class="n">11</span> Step 7 — Review, approve, download</div>
+  <div><span class="n">12</span> The Excel workbook, tab by tab</div>
+  <div><span class="n">13</span> How quantities are calculated (rules)</div>
+  <div><span class="n">14</span> How the AI reading works and its limits</div>
+  <div><span class="n">15</span> Preparing drawings for best results</div>
+  <div><span class="n">16</span> Administrator guide</div>
+  <div><span class="n">17</span> Architecture, hosting and local setup</div>
+  <div><span class="n">18</span> Troubleshooting and FAQ</div>
+  <div><span class="n">19</span> Appendix A — Item codes</div>
+  <div><span class="n">20</span> Appendix B — Default material norms</div>
+  <div><span class="n">21</span> Appendix C — API endpoints</div>
+  <div><span class="n">22</span> Appendix D — Glossary</div>
+</div>
+
+<!-- ===================================================== 1 -->
+<div class="section"></div>
+<h1><span class="num">1</span>What the application does</h1>
+<p class="lead">Avighna BOQ turns a construction drawing into a quantity take-off. A site engineer uploads a drawing (DWG preferred; DXF, PDF and images also work). The system reads the rooms, doors, windows, walls, slabs, columns and beams from it, measures every item the way a quantity surveyor would, and produces an Excel file with three linked results:</p>
+<div class="flow">
+  <div class="step"><b>1. Drop the drawing</b>DWG / DXF / PDF / image. One floor or area per job.</div>
+  <div class="arrow">→</div>
+  <div class="step"><b>2. AI + engine read it</b>Rooms, openings, walls, slabs, members, other items — with sizes, finishes and evidence.</div>
+  <div class="arrow">→</div>
+  <div class="step"><b>3. Measurement Sheet</b>Item-wise blocks, one row per drawing object, Nos × L × B × H, deductions as minus rows (IS 1200).</div>
+  <div class="arrow">→</div>
+  <div class="step"><b>4. BOQ abstract</b>One line per item with description, quantity and unit. Rates are left blank.</div>
+  <div class="arrow">→</div>
+  <div class="step"><b>5. Material requirement</b>Cement bags, sand, tiles, paint, steel… = quantity × norm × wastage.</div>
+</div>
+<p>Everything that comes out of the system is <b>traceable</b>. Every row of the measurement sheet points to a drawing object (a wall, a door, a room). Every element the AI read carries a confidence score and an evidence note. Every quantity in the BOQ is a live Excel formula that links back to the measurement sheet. Reviewers can correct any element in the browser and recompute; the Excel is produced only from the corrected data.</p>
+
+<h2>What it is not</h2>
+<ul>
+  <li>It is <b>not a pricing tool</b>. Rates and amounts are intentionally blank in the BOQ; your estimator fills them in Excel.</li>
+  <li>It is <b>not a replacement for a bar bending schedule</b>. Reinforcement steel is a thumb-rule estimate (kg per cum) and is flagged as such.</li>
+  <li>It does <b>not guess silently</b>. When the drawing does not give a size, the element is skipped or marked low-confidence and a warning is shown.</li>
+</ul>
+
+<div class="callout"><b>Where to find it.</b> Web app: <code>https://avighna-boq.vercel.app</code> &nbsp;·&nbsp; API: <code>https://avighna-boq.onrender.com</code> &nbsp;·&nbsp; On the development Mac: <code>http://localhost:3000</code>. Sign in with the account your administrator created for you.</div>
+
+<!-- ===================================================== 2 -->
+<h1><span class="num">2</span>Who uses it — roles</h1>
+<p>Each user has one role. The role decides which buttons are visible and which actions the server accepts.</p>
+<table>
+  <tr><th style="width:16%">Role</th><th style="width:30%">Typical person</th><th>Can do</th><th style="width:22%">Cannot do</th></tr>
+  <tr><td><b>Engineer</b></td><td>Site / planning engineer, junior QS</td><td>Create jobs (upload drawings), watch processing, correct elements and recompute, download the Excel once a job is <i>Ready for review</i>, reprocess a job.</td><td>Approve or send back a job; manage users.</td></tr>
+  <tr><td><b>Reviewer</b></td><td>Senior QS, project manager</td><td>Everything an engineer can, plus <b>Approve</b> (signs the job off) and <b>Send back</b> with a note (reopens it for correction).</td><td>Manage users or system settings.</td></tr>
+  <tr><td><b>Admin</b></td><td>IT / head of department</td><td>Everything, plus the <b>Users</b> page: invite users, set roles, reset passwords, deactivate accounts; see the audit log, system status and backups.</td><td>—</td></tr>
+</table>
+<p class="small muted">All sensitive actions (sign-in, element edits, approvals, user changes) are written to the audit log with the user's e-mail and time.</p>
+
+<!-- ===================================================== 3 -->
+<h1><span class="num">3</span>Key terms, explained simply</h1>
+<table class="kv">
+  <tr><td>Job</td><td>One upload = one job. A job holds the drawing files, the sheets read from them, the elements, the measurement result and the Excel. Name it by project and floor (e.g. "Nishika Elysium — 6th floor").</td></tr>
+  <tr><td>Sheet</td><td>One page of a PDF, or one layout of a DWG/DXF (usually the <i>Model</i> space). Each sheet is classified (floor plan, finishes plan, door schedule, elevation, …) and gets a preview image.</td></tr>
+  <tr><td>Elements</td><td>What was read from the drawing, in six groups: <b>Rooms</b> (name, L × W × H, area, finishes), <b>Openings</b> (doors, windows, ventilators with W × H and count), <b>Walls</b> (RCC / block / partition with L, thickness, H), <b>Slabs</b>, <b>Columns &amp; beams</b>, and <b>Other items</b> (anything countable: furniture, fixtures, counters, thresholds).</td></tr>
+  <tr><td>Assumptions</td><td>Project-level defaults used when a value is not on the drawing: floor height, wall thickness, slab thickness, construction type (Mivan / conventional), concrete grade. Editable on the Elements tab.</td></tr>
+  <tr><td>Confidence</td><td>How sure the reader is about an element, from 0 to 100 %. Anything the AI had to infer (e.g. a height not on the drawing) is marked low; anything you edit becomes 100 %.</td></tr>
+  <tr><td>Evidence</td><td>A short note of where the value came from: the text on the drawing, the dimension line, the schedule row, or "edited by …".</td></tr>
+  <tr><td>Measurement Sheet</td><td>The detailed take-off. Grouped by item (e.g. "12 mm internal plaster"). Each row is one object from the drawing with No. × L × B × H = Qty. Deductions (doors, windows) appear as minus rows. Each block ends with a total.</td></tr>
+  <tr><td>BOQ (Abstract)</td><td>The summary: one line per item with a CPWD-style description, the total quantity (linked to the measurement sheet), the unit, and blank rate / amount columns.</td></tr>
+  <tr><td>Material Requirement</td><td>For every BOQ line, the materials needed: BOQ quantity × consumption norm × (1 + wastage %). Summed per material at the bottom (e.g. total cement bags).</td></tr>
+  <tr><td>Basis</td><td>How a BOQ line was obtained: <span class="pill green">measured</span> from drawing objects, <span class="pill amber">thumb rule</span> (steel kg/cum — replace with BBS), or <span class="pill grey">manual</span>.</td></tr>
+  <tr><td>Status</td><td>Where a job is in its life: Queued → Converting → Analysing → Extracting → Quantifying → <b>Ready for review</b> → <b>Approved</b>. <b>Failed</b> if something went wrong (the message says what).</td></tr>
+</table>
+
+<!-- ===================================================== 4 -->
+<h1><span class="num">4</span>Quick start in 6 steps</h1>
+<ol>
+  <li><b>Sign in</b> at the web address with your e-mail and password. On first sign-in you set your own password.</li>
+  <li>Click <b>New measurement</b>. Enter the project name and the floor / level. Drop the drawing files (DWG preferred). Click <b>Upload &amp; measure</b>.</li>
+  <li>Wait for the status to reach <b>Ready for review</b> (typically 2–5 minutes per sheet; large DWGs take longer). The pipeline panel on the right shows each step.</li>
+  <li>Open the <b>Elements</b> tab. Check the rooms, openings and walls against the drawing. Fix anything wrong, add what is missing, then click <b>Save &amp; recompute</b>.</li>
+  <li>Read the <b>Measurement Sheet</b>, <b>BOQ</b> and <b>Materials</b> tabs. Warnings at the top tell you what to double-check.</li>
+  <li>A reviewer clicks <b>Approve</b>. Anyone clicks <b>Download Excel</b> to get the workbook with live formulas.</li>
+</ol>
+
+<!-- ===================================================== 5 -->
+<div class="section"></div>
+<h1><span class="num">5</span>Step 1 — Sign in</h1>
+<div class="figure"><img src="01_login.png" alt="Sign-in page"><div class="cap">Figure 1 — The sign-in page. Accounts are created by an administrator; there is no self-registration.</div></div>
+<ul>
+  <li>Enter the e-mail and password your administrator gave you. A temporary password must be changed at first sign-in; the app asks for a new one automatically.</li>
+  <li>Sessions last 12 hours. After that you are asked to sign in again.</li>
+  <li>Forgot your password? Ask an admin to reset it; they will give you a new temporary password (shown to them once).</li>
+  <li>Repeated wrong passwords temporarily block sign-in for that account; wait a few minutes and try again.</li>
+</ul>
+<div class="figure"><img src="02_dashboard.png" alt="Dashboard"><div class="cap">Figure 2 — The dashboard after sign-in: counters, recent jobs, a "Start here" card and the three-step "How it works" panel.</div></div>
+
+<!-- ===================================================== 6 -->
+<div class="section"></div>
+<h1><span class="num">6</span>Step 2 — Create a new measurement</h1>
+<div class="figure"><img src="03_new_measurement.png" alt="New measurement"><div class="cap">Figure 3 — New measurement: project details and the drawing drop zone.</div></div>
+<table class="kv">
+  <tr><td>Project name <span class="pill red">required</span></td><td>The project the drawing belongs to. Appears in the Excel title and the job list.</td></tr>
+  <tr><td>Floor / Level <span class="pill red">required</span></td><td>Which floor or area the drawing shows, e.g. "6th floor", "Sales centre", "Typical floor 6–17". Used in every measurement-sheet row and lets you compare floors later.</td></tr>
+  <tr><td>Building / Wing</td><td>Optional: tower or wing name.</td></tr>
+  <tr><td>Drawing files</td><td>Drop one or more files: <b>DWG</b> (best — exact vector text and geometry), <b>DXF</b>, <b>PDF</b> (vector plots are read exactly; scanned PDFs are read from the image), <b>PNG / JPG / TIFF</b>. Up to 200 MB per upload.</td></tr>
+</table>
+<h2>Which files to upload together</h2>
+<ul>
+  <li>Put <b>one floor (or one area) in one job</b>. Upload the plan plus its supporting sheets: the floor finishes plan, the door / window schedule, and section or detail sheets that carry heights. The reader merges them — a door schedule gives sizes and counts, the plan gives which room each door is in.</li>
+  <li>Do not mix two different floors in one job; create a job per floor instead (the Excel has a per-floor "Tender vs Site" template).</li>
+  <li>Xref base plans are useful but not required; the sheet that carries the room names and dimensions matters most.</li>
+</ul>
+<p>Click <b>Upload &amp; measure</b>. The browser shows the upload progress and then opens the job page.</p>
+
+<!-- ===================================================== 7 -->
+<h1><span class="num">7</span>Step 3 — Processing and job status</h1>
+<p>The job page shows the current status at the top and a <b>Pipeline</b> panel on the right with every step and its time. You can leave the page; processing continues on the server.</p>
+<table>
+  <tr><th style="width:20%">Status</th><th>What is happening</th><th style="width:26%">Typical duration</th></tr>
+  <tr><td><span class="pill grey">Queued</span></td><td>Waiting for a free worker.</td><td>seconds</td></tr>
+  <tr><td><span class="pill grey">Converting</span></td><td>DWG files are converted to DXF (LibreDWG); the real file type is detected from the bytes, not the extension.</td><td>5–90 s per DWG</td></tr>
+  <tr><td><span class="pill grey">Analysing</span></td><td>Every sheet is read into a text inventory (exact vector text with coordinates), a preview image is rendered, and the sheet is classified (floor plan, finishes plan, door schedule, elevation, …).</td><td>10 s – 3 min per sheet</td></tr>
+  <tr><td><span class="pill grey">Extracting</span></td><td>The AI reads each relevant sheet (image + exact text + measured CAD facts) into elements. Sheets that cannot help (cover, perspective, notes) are skipped.</td><td>1–3 min per sheet when the AI service is responsive; up to 10 min on a slow day</td></tr>
+  <tr><td><span class="pill grey">Quantifying</span></td><td>The deterministic engine builds the measurement sheet, BOQ and materials. No AI is involved here.</td><td>&lt; 1 s</td></tr>
+  <tr><td><span class="pill green">Ready for review</span></td><td>Done. Elements and results can be checked, corrected and downloaded.</td><td>—</td></tr>
+  <tr><td><span class="pill green">Approved</span></td><td>A reviewer signed the job off. It is read-only until it is sent back.</td><td>—</td></tr>
+  <tr><td><span class="pill red">Failed</span></td><td>Something stopped the job; the last pipeline message says what (e.g. "No sheets could be read"). Fix the input and <b>Reprocess</b>.</td><td>—</td></tr>
+</table>
+<div class="callout grey"><b>Messages you may see in the pipeline panel.</b> "preview could not be rendered" — the drawing was too heavy to draw within the time limit; the AI still reads the text and CAD facts. "AI reading failed … rooms taken from CAD outlines only" — the AI service did not answer; the fallback reads room names and door tags from the CAD file and shows rooms as equivalent squares at 50 % confidence — check them. "Room X: size missing, skipped" — no dimensions were found for that room; add them on the Elements tab.</div>
+
+<!-- ===================================================== 8 -->
+<div class="section"></div>
+<h1><span class="num">8</span>Step 4 — Check and correct the Elements</h1>
+<p class="lead">This is the most important screen. The measurement sheet, BOQ and materials are all computed from what is on this tab, so five minutes here decide the quality of the whole output.</p>
+<div class="figure"><img src="09_elements.png" alt="Elements tab"><div class="cap">Figure 4 — Elements tab: Assumptions card, then Rooms, Openings, Walls, Slabs, Columns &amp; beams and Other items. Each row shows its confidence; the "i" opens the evidence.</div></div>
+<h2>What to check, in order</h2>
+<ol>
+  <li><b>Assumptions</b> — floor height, wall thickness, slab thickness, construction type, concrete grade. These fill every blank on the drawing, so set them first.</li>
+  <li><b>Rooms</b> — every room on the plan is listed once, with L × W (or a measured area), height, and the floor / wall / ceiling finish. Mark wet areas (toilets, pantry) so waterproofing and dado are measured. Skirting height and dado height are per room.</li>
+  <li><b>Openings</b> — each door / window type with width, height, count and the room it belongs to. Counts come from the schedule; the room name is used to deduct the opening from that room's plaster, paint and skirting.</li>
+  <li><b>Walls, Slabs, Columns &amp; beams</b> — structural items, if the drawing shows them. Leave empty for a pure finishes job.</li>
+  <li><b>Other items</b> — countable things the AI noticed (reception desk, workstations, counters, thresholds). They go to the BOQ as "nos" / "LS" lines.</li>
+</ol>
+<h2>Editing</h2>
+<ul>
+  <li>Click a row (or its pencil) to open the edit dialog. Numbers must be positive; counts must be at least 1.</li>
+  <li><b>Add</b> creates a new row in that section; <b>Delete</b> removes one (you are asked to confirm).</li>
+  <li>Edited rows get confidence 100 % and an evidence note "edited by &lt;you&gt; on &lt;date&gt;".</li>
+  <li>Nothing is saved until you press <b>Save &amp; recompute</b>. The button is grey until something changed. <b>Discard</b> throws the changes away.</li>
+  <li>Saving sends the whole element list to the server, recomputes every tab and refreshes the Excel on the next download.</li>
+</ul>
+<div class="figure"><img src="10_edit_room_dialog.png" alt="Edit dialog"><div class="cap">Figure 5 — Editing a room. Finishes drive flooring, skirting, plaster and paint items; "wet area" adds waterproofing and dado.</div></div>
+<div class="callout"><b>Rule of thumb.</b> If a value is on the drawing and the app got it wrong, correct it here — never in Excel. The Excel is regenerated from these elements, and a corrected element keeps the audit trail (who changed what, when).</div>
+
+<!-- ===================================================== 9 -->
+<div class="section"></div>
+<h1><span class="num">9</span>Step 5 — Read the Measurement Sheet</h1>
+<div class="figure"><img src="05_measurement_sheet.png" alt="Measurement sheet"><div class="cap">Figure 6 — Measurement Sheet tab: the sticky summary strip (items, totals per trade), warnings from the reading, then one card per item.</div></div>
+<div class="figure"><img src="06_measurement_sheet_block.png" alt="Measurement block"><div class="cap">Figure 7 — One item block. Each row is one object from the drawing. Grey rows with "−" are deductions; the red row is the block total that feeds the BOQ.</div></div>
+<h2>How to read a block</h2>
+<table>
+  <tr><th>Column</th><th>Meaning</th></tr>
+  <tr><td>Sr</td><td>Row number inside the block.</td></tr>
+  <tr><td>Location</td><td>What and where: "Wall W2, Bedroom 1, 6th floor", "Deduct: Door D1 in W2". This is the link back to the drawing.</td></tr>
+  <tr><td>No.</td><td>How many of this object (negative for deductions; for formwork it is the number of faces).</td></tr>
+  <tr><td>L, B, H (m)</td><td>Length, breadth, height in metres. A blank B or H means that dimension is not part of the item (e.g. plaster is L × H).</td></tr>
+  <tr><td>Qty</td><td>No. × L × B × H in the item's unit (cum, sqm, rmt, nos).</td></tr>
+  <tr><td>Rule / ref</td><td>The measurement rule applied (e.g. "IS 1200 Pt 12: opening &gt; 3 sqm, both faces + jambs") or the source ("door schedule").</td></tr>
+</table>
+<p>The summary strip shows the totals per trade (RCC in cum, Plaster / Flooring / Painting in sqm, Doors in nos, …). The amber box lists warnings from the reading — read them before trusting the numbers.</p>
+
+<!-- ===================================================== 10 -->
+<h1><span class="num">10</span>Step 6 — BOQ, Materials and Sheets tabs</h1>
+<div class="figure"><img src="07_boq.png" alt="BOQ tab"><div class="cap">Figure 8 — BOQ tab: one line per item, grouped by trade, with a basis badge. Quantities only; rates are left blank on purpose.</div></div>
+<p><b>BOQ</b> — the abstract. Item number, CPWD-style description, quantity, unit and basis. <span class="pill green">measured</span> means the quantity comes from measured drawing objects; <span class="pill amber">thumb rule</span> is used only for reinforcement steel and must be replaced by a bar bending schedule before tender.</p>
+<div class="figure"><img src="08_materials.png" alt="Materials tab"><div class="cap">Figure 9 — Materials tab: for each BOQ line the material, norm, wastage and required quantity; a summary by material at the end.</div></div>
+<p><b>Materials</b> — for each BOQ line, the materials it consumes. Required = BOQ qty × norm × (1 + wastage %). The norms are company standards (Appendix B); an admin can tune them. The summary table at the bottom adds up each material across all items (e.g. total cement bags for plaster + flooring + masonry).</p>
+<div class="figure"><img src="11_sheets.png" alt="Sheets tab"><div class="cap">Figure 10 — Sheets tab: every sheet read from the files with its preview, classification and processing notes.</div></div>
+<p><b>Sheets</b> — what the system saw: each file / page / layout, its preview image, the detected sheet type (floor plan, finishes plan, door schedule, elevation, …), units, drawing number, and processing notes. Use it to confirm that the right sheets were read and that previews rendered.</p>
+
+<!-- ===================================================== 11 -->
+<div class="section"></div>
+<h1><span class="num">11</span>Step 7 — Review, approve, download</h1>
+<table>
+  <tr><th style="width:22%">Button</th><th style="width:16%">Who</th><th>What it does</th></tr>
+  <tr><td><b>Reprocess</b></td><td>Everyone</td><td>Runs the whole pipeline again on the same files (after a settings change, or when the AI service was down). Manual edits are replaced by the new reading.</td></tr>
+  <tr><td><b>Save &amp; recompute</b> (Elements tab)</td><td>Everyone</td><td>Saves corrected elements and recomputes measurement, BOQ and materials.</td></tr>
+  <tr><td><b>Approve</b></td><td>Reviewer, Admin</td><td>Signs the job off. Status becomes <i>Approved</i>; the job is read-only; the Excel is marked approved.</td></tr>
+  <tr><td><b>Send back</b></td><td>Reviewer, Admin</td><td>Returns an approved or ready job for correction with a note that is shown on the job and stored in the audit log.</td></tr>
+  <tr><td><b>Download Excel</b></td><td>Everyone</td><td>Available once the job is <i>Ready for review</i> or <i>Approved</i>. The file name carries the project, level and version.</td></tr>
+</table>
+<div class="callout grey"><b>Suggested workflow.</b> Engineer uploads and corrects elements → Reviewer checks the Elements tab against the drawing, reads the warnings, approves → Estimator downloads the Excel, fills rates in the BOQ tab → Site team uses the Tender vs Site tab during execution.</div>
+<div class="figure"><img src="04_jobs.png" alt="Jobs list"><div class="cap">Figure 11 — Jobs list: all jobs with status, result headline, owner and date. Filter by status.</div></div>
+
+<!-- ===================================================== 12 -->
+<h1><span class="num">12</span>The Excel workbook, tab by tab</h1>
+<p>The workbook is produced by the server from the current elements. All arithmetic is written as live Excel formulas, so an estimator can see and audit every number.</p>
+<table>
+  <tr><th style="width:24%">Tab</th><th>Contents</th><th style="width:30%">Formulas</th></tr>
+  <tr><td><b>Measurement Sheet</b></td><td>Title with project, level and drawing numbers. One block per item: item code and description row, then rows Sr | Location | No. | L | B | H | Qty | Unit | Rule / ref. Deduction rows are grey, totals light red.</td><td>Qty <code>=C*D*E*F</code> (blank dimensions are skipped); block total <code>=SUM(...)</code>.</td></tr>
+  <tr><td><b>BOQ (Abstract)</b></td><td>Item | Description | Qty | Unit | Rate (INR) | Amount (INR) | Basis, grouped by trade. Total, GST @ 18 % and grand total rows at the end.</td><td>Qty <code>='Measurement Sheet'!G&lt;total row&gt;</code>; Amount <code>=Qty*Rate</code>; totals <code>=SUM</code>.</td></tr>
+  <tr><td><b>Material Requirement</b></td><td>Material | For item | BOQ qty | Unit | Norm per unit | Wastage % | Required | Material unit | Basis; then a summary by material.</td><td>Required <code>=C*E*(1+F/100)</code>; BOQ qty linked to the measurement sheet.</td></tr>
+  <tr><td><b>Tender vs Site</b></td><td>Template per item: Tender qty (linked), Site measured qty (blank, for the site engineer), Difference and Variation %.</td><td>Difference and % as formulas.</td></tr>
+  <tr><td><b>Elements (from drawing)</b></td><td>The rooms, openings, walls, slabs, members and other items exactly as read / corrected, with confidence, evidence and source sheet.</td><td>—</td></tr>
+</table>
+<div class="callout"><b>Do not retype quantities in Excel.</b> Change the element in the app and download again. If you must adjust in Excel, change the measurement-sheet row (L, B, H or No.) — the BOQ and materials follow automatically.</div>
+
+<!-- ===================================================== 13 -->
+<div class="section"></div>
+<h1><span class="num">13</span>How quantities are calculated (rules)</h1>
+<p>The engine follows IS 1200 (method of measurement of building works) and common Indian QS practice. The rules below are what the measurement sheet applies; every row names the rule it used.</p>
+<table>
+  <tr><th style="width:24%">Item</th><th>Rule</th></tr>
+  <tr><td>Flooring (per finish)</td><td>Room area (L × W, or the measured area if the drawing gives one). One BOQ item per finish type (e.g. "FC-201 1200×1200 stone").</td></tr>
+  <tr><td>Skirting</td><td>Room perimeter minus the widths of the doors in that room (100 mm high by default, per room).</td></tr>
+  <tr><td>Internal plaster</td><td>Perimeter × height for plastered rooms. Openings: ≤ 0.5 sqm — no deduction; 0.5 to 3 sqm — deduct one face; &gt; 3 sqm — deduct both faces and add jambs and soffits.</td></tr>
+  <tr><td>Ceiling plaster / paint</td><td>Room area.</td></tr>
+  <tr><td>Wall paint</td><td>Same area as internal plaster, same opening rule; the paint system comes from the room's wall finish.</td></tr>
+  <tr><td>Dado (wall tiles)</td><td>Wet areas only: perimeter × dado height, minus door widths × dado height.</td></tr>
+  <tr><td>Waterproofing</td><td>Wet areas only: floor area + 300 mm upturn along the perimeter.</td></tr>
+  <tr><td>Doors / windows</td><td>Counted in nos from the openings list (one item per tag, size and description in the text). Windows also give an area for fabricated items.</td></tr>
+  <tr><td>RCC walls</td><td>Nos × L × thickness × H minus openings (Nos × W × thickness × H).</td></tr>
+  <tr><td>Formwork to walls</td><td>Contact area, both faces: 2 × L × H minus 2 × opening area.</td></tr>
+  <tr><td>Columns</td><td>Concrete W × D × storey height; formwork = perimeter × height (4 sides).</td></tr>
+  <tr><td>Beams</td><td>Concrete W × (D − slab thickness) × L (the part below the slab); formwork = 2 sides + soffit.</td></tr>
+  <tr><td>Slabs</td><td>Concrete L × W × thickness; formwork = soffit minus beam widths.</td></tr>
+  <tr><td>Block masonry</td><td>cum for walls ≥ 150 mm (L × thickness × H minus openings); sqm for thinner partitions.</td></tr>
+  <tr><td>Reinforcement steel</td><td><b>Thumb rule</b>, flagged in the BOQ: walls 125, columns 200, beams 150, slabs 85 kg per cum. Replace with the bar bending schedule for tender.</td></tr>
+  <tr><td>Other items</td><td>Taken as given (nos / rmt / sqm / LS) and placed under their trade.</td></tr>
+</table>
+<p class="small muted">Rounding: dimensions are kept to 3 decimals; quantities are rounded to 3 decimals in the app and left as formulas in Excel.</p>
+
+<!-- ===================================================== 14 -->
+<h1><span class="num">14</span>How the AI reading works and its limits</h1>
+<p>The AI (Google Gemini 2.5 Pro) does not estimate areas from a picture. For each sheet it receives three things: the <b>preview image</b> (for layout), the <b>exact vector text</b> of the drawing with coordinates (so numbers are never misread), and <b>measured CAD facts</b> computed by the engine from the DXF — room outlines with area and perimeter, hatch areas with their finish codes, door / window tag counts, polyline lengths. It returns the elements in a strict structure with confidence and evidence. The engine then does all the arithmetic.</p>
+<h2>What it is good at</h2>
+<ul>
+  <li>Floor plans with room names and dimension lines; finishes plans with finish tags (FC-201 …); door / window schedules with sizes and counts; general notes with heights and construction type.</li>
+  <li>Merging several sheets: the plan gives rooms, the schedule gives sizes, the finishes plan gives materials.</li>
+</ul>
+<h2>Where to be careful</h2>
+<ul>
+  <li><b>Elevation and section sheets</b> are not plans: the small coded hatches on them are legend swatches, not areas. Upload them for heights, but check any room that appears only from an elevation.</li>
+  <li><b>Furniture / general arrangement plans</b> without dimensions give room names but no sizes. Add the finishes plan or the dimensioned plan in the same job.</li>
+  <li><b>Scanned PDFs and photos</b> have no vector text, so numbers are read from the image — expect lower confidence.</li>
+  <li><b>Very large DWGs</b> (20 MB and more) may not render a preview within the time limit; the AI then reads from text and CAD facts only, and the pipeline says so.</li>
+  <li>When the AI service is unavailable, the fallback produces rooms as equivalent squares at 50 % confidence — use it only as a starting point.</li>
+</ul>
+<div class="callout"><b>Always check low-confidence rows.</b> The Elements tab counts them in the alert at the top. A value below 70 % means the reader inferred it; confirm it against the drawing.</div>
+
+<!-- ===================================================== 15 -->
+<div class="section"></div>
+<h1><span class="num">15</span>Preparing drawings for best results</h1>
+<ul>
+  <li><b>Export the DWG in AutoCAD 2018 format</b> (AC1032) with the plan in Model space. Purge unused blocks to reduce size.</li>
+  <li><b>Name every room</b> with text inside its outline; keep dimension lines on the plan (overall and room-wise).</li>
+  <li><b>Use door / window tags</b> (D1, W2, …) on the plan and include the schedule sheet with width × height and counts.</li>
+  <li><b>Tag finishes</b> with codes (FC-201 stone, FC-202 carpet …) pointing into the hatched area via leaders; one hatch per zone.</li>
+  <li><b>State heights</b> (floor-to-floor, false ceiling, skirting, dado) in notes or sections — otherwise the Assumptions defaults are used.</li>
+  <li><b>One floor per job.</b> For typical floors that repeat, measure one floor and multiply in the BOQ, or create one job per floor to catch differences.</li>
+  <li>PDF: prefer the vector plot from AutoCAD over a scan; keep text as text (do not outline fonts).</li>
+</ul>
+
+<!-- ===================================================== 16 -->
+<h1><span class="num">16</span>Administrator guide</h1>
+<div class="figure"><img src="12_users.png" alt="Users page"><div class="cap">Figure 12 — Users page (admins only): invite, change role, reset password, deactivate; the audit log and system card are below.</div></div>
+<h2>Users</h2>
+<ul>
+  <li><b>Invite</b> a user with name, e-mail and role. A temporary password is shown once — pass it on securely. The user must change it at first sign-in.</li>
+  <li><b>Change role</b> at any time (engineer / reviewer / admin). The change applies on the user's next request.</li>
+  <li><b>Reset password</b> issues a new temporary password; <b>Deactivate</b> blocks sign-in without deleting history.</li>
+  <li>The first admin account is created from the server's <code>BOOTSTRAP_ADMIN_EMAIL</code> / <code>BOOTSTRAP_ADMIN_PASSWORD</code> settings on first start.</li>
+</ul>
+<h2>System card and audit log</h2>
+<ul>
+  <li>The <b>System</b> card shows the API version, whether AI reading is on and which models are used, which DWG converter is available, database and storage backends, memory limits and worker threads.</li>
+  <li>The <b>Audit log</b> lists sign-ins, element edits, approvals, send-backs, user changes and settings changes with user and time.</li>
+  <li><b>Backup</b>: admins can download a database backup from the API (<code>GET /api/v1/admin/backup</code>).</li>
+</ul>
+<h2>Standards and norms</h2>
+<p>Material consumption norms and wastage percentages (Appendix B) and the steel thumb rules are company standards kept on the server. Change them through the Standards API (admin) and reprocess or recompute jobs to apply them; the Excel shows which norm was used on every material row.</p>
+<h2>Server settings (environment variables)</h2>
+<table class="small">
+  <tr><th style="width:30%">Variable</th><th>Purpose</th></tr>
+  <tr><td><code>GEMINI_API_KEY</code></td><td>Turns AI reading on. Without it the app still runs with the deterministic fallback.</td></tr>
+  <tr><td><code>GEMINI_MODEL_PRO</code> / <code>GEMINI_MODEL_FAST</code></td><td>Models for reading (default gemini-2.5-pro) and classification (gemini-2.5-flash).</td></tr>
+  <tr><td><code>GEMINI_TIMEOUT_S</code></td><td>Maximum seconds per AI call (default 600). A hung call fails cleanly and the fallback is used.</td></tr>
+  <tr><td><code>DATABASE_URL</code></td><td>PostgreSQL connection (Supabase in production). Without it a local SQLite file is used.</td></tr>
+  <tr><td><code>STORAGE_BACKEND</code> + Supabase keys</td><td><code>supabase</code> stores uploads, previews and exports in Supabase Storage; otherwise the local data folder.</td></tr>
+  <tr><td><code>CORS_ORIGINS</code></td><td>Allowed browser origins (the Vercel URL); *.vercel.app and *.onrender.com are allowed by default.</td></tr>
+  <tr><td><code>BOOTSTRAP_ADMIN_EMAIL</code> / <code>…_PASSWORD</code></td><td>First admin account.</td></tr>
+  <tr><td><code>MAX_UPLOAD_MB</code>, <code>WORKER_THREADS</code>, <code>LIBREDWG_BIN</code></td><td>Upload limit (200), parallel jobs (2), path to the DWG converter.</td></tr>
+</table>
+<p class="small muted">Secrets (API keys, database passwords, the Supabase service key) live only in the hosting provider's environment settings. They are never stored in the repository or shown in the app.</p>
+
+<!-- ===================================================== 17 -->
+<div class="section"></div>
+<h1><span class="num">17</span>Architecture, hosting and local setup</h1>
+<table class="kv">
+  <tr><td>Web app (frontend)</td><td>Next.js 15 / React 19, hosted on <b>Vercel</b> (<code>avighna-boq.vercel.app</code>). Talks to the API over HTTPS with a signed-in token.</td></tr>
+  <tr><td>API (backend)</td><td>Python FastAPI, hosted on <b>Render</b> as a Docker container (<code>avighna-boq.onrender.com</code>). Contains the DWG converter (LibreDWG 0.13.4), the sheet readers, the AI wrapper, the measurement engine and the Excel writer. Two worker threads process jobs in the background.</td></tr>
+  <tr><td>Database and files</td><td><b>Supabase</b>: PostgreSQL for users, jobs, sheets, elements, results and the audit log (row-level security enabled); Supabase Storage for uploaded drawings, previews and Excel files.</td></tr>
+  <tr><td>AI</td><td>Google Gemini 2.5 Pro (reading) and 2.5 Flash (classification), called from the API only.</td></tr>
+  <tr><td>Deployment</td><td>Every push to the <code>main</code> branch of <code>github.com/ajs-avg/Avighna-BOQ</code> redeploys Vercel (about 1 minute) and Render (about 10 minutes, because the DWG converter is built from source).</td></tr>
+</table>
+<h2>Pipeline inside the API</h2>
+<div class="flow">
+  <div class="step"><b>Convert</b>detect type; DWG → DXF; sanitise</div><div class="arrow">→</div>
+  <div class="step"><b>Read sheets</b>text inventory, preview, classification</div><div class="arrow">→</div>
+  <div class="step"><b>Measure CAD</b>room outlines, hatch areas, tag counts</div><div class="arrow">→</div>
+  <div class="step"><b>AI extraction</b>elements with confidence + evidence</div><div class="arrow">→</div>
+  <div class="step"><b>Engine</b>measurement sheet, BOQ, materials</div><div class="arrow">→</div>
+  <div class="step"><b>Excel</b>5 tabs, live formulas</div>
+</div>
+<h2>Running on a laptop (development)</h2>
+<pre>git clone https://github.com/ajs-avg/Avighna-BOQ.git
+cd Avighna-BOQ
+# backend (Python 3.12 virtual environment with uv)
+cd backend && uv venv --python 3.12 .venv && uv pip install --python .venv/bin/python -r requirements.txt
+cp .env.example .env      # set BOOTSTRAP_ADMIN_*, GEMINI_API_KEY, LIBREDWG_BIN
+./run.sh                  # API on http://localhost:8000
+# frontend (new terminal)
+cd frontend && npm install && npm run dev      # app on http://localhost:3000
+# or both at once from the repo root
+tools/dev.sh</pre>
+<p class="small muted">Tests: <code>cd backend && PYTHONPATH=. .venv/bin/python -m pytest tests -q</code> (49 tests, SQLite) and <code>tools/test_postgres.sh</code> (same tests on an embedded PostgreSQL). Frontend: <code>npm run typecheck && npm run lint && npm run build</code>.</p>
+
+<!-- ===================================================== 18 -->
+<div class="section"></div>
+<h1><span class="num">18</span>Troubleshooting and FAQ</h1>
+<table>
+  <tr><th style="width:34%">Symptom</th><th>Cause and what to do</th></tr>
+  <tr><td>"Cannot reach the API … Is the backend running?" on the sign-in page</td><td>The API is down or waking up (Render free instances sleep after idle and take about a minute to wake). Wait and retry; on a laptop start the backend.</td></tr>
+  <tr><td>Banner "AI reading is off"</td><td>No <code>GEMINI_API_KEY</code> on the server. Rooms come from CAD outlines only. Ask the admin to set the key, then <b>Reprocess</b>.</td></tr>
+  <tr><td>Job finished in seconds with strange rooms ("Entrance 44 × 44 m")</td><td>The AI did not run (no key, service down, or no readable sheet). Check the pipeline messages and the Sheets tab; reprocess once the service is back.</td></tr>
+  <tr><td>"preview could not be rendered"</td><td>Drawing too heavy to draw in time. Reading continues from text and CAD facts. Purge the DWG or upload the PDF plot as well.</td></tr>
+  <tr><td>"DWG conversion failed for …"</td><td>The file is not a DWG, is password-protected, or uses a format the converter cannot read. Save as AutoCAD 2018 DWG or DXF and upload again.</td></tr>
+  <tr><td>Job <i>Failed</i>: "No sheets could be read"</td><td>None of the files produced a readable sheet (empty PDF, image-only PDF with no content, corrupt file). Check the files and re-upload.</td></tr>
+  <tr><td>"Room X: size missing, skipped"</td><td>No dimensions found for that room. Add L × W on the Elements tab or include the dimensioned plan.</td></tr>
+  <tr><td>"Door D5: room 'RECEPTION' not found …"</td><td>The door schedule names a room that is not in the Rooms list, so no deduction was made. Add the room or correct the door's room field.</td></tr>
+  <tr><td>Processing is slow (10 minutes per sheet)</td><td>Usually the AI service is slow that day; the job still completes. Large DWGs also take longer to convert and render.</td></tr>
+  <tr><td>Server memory limit on Render ("instance exceeded memory")</td><td>A very large DXF needs more RAM than the instance has. The app skips files above its limit with a message; the admin can move to a larger instance (2 GB recommended).</td></tr>
+  <tr><td>Download Excel is disabled</td><td>The job is not yet <i>Ready for review</i>, or there are unsaved element edits — save or discard first.</td></tr>
+  <tr><td>Approve is disabled</td><td>Only reviewers and admins can approve, only jobs in <i>Ready for review</i>, and not while edits are unsaved.</td></tr>
+</table>
+<h2>FAQ</h2>
+<p><b>Can I measure a PDF without the DWG?</b> Yes. A vector PDF (plotted from CAD) keeps exact text and is read well; a scanned PDF is read from the image with lower confidence.</p>
+<p><b>Does the app price the BOQ?</b> No. Rates are blank by design; the estimator fills them in Excel and the amount formulas take over.</p>
+<p><b>Where does steel come from?</b> From thumb rules (kg per cum of concrete), clearly marked. Use the bar bending schedule for tender quantities.</p>
+<p><b>Can I change the consumption norms?</b> Yes, an admin can update them on the server (Standards). The Excel shows the norm used on every row.</p>
+<p><b>Is my drawing sent anywhere?</b> The drawing is stored in the company's Supabase storage and the sheet image plus text is sent to Google's Gemini API for reading. No other third party is involved.</p>
+
+<!-- ===================================================== 19 -->
+<div class="section"></div>
+<h1><span class="num">19</span>Appendix A — Item codes</h1>
+<p>Each block on the measurement sheet and each BOQ line carries an item code. Codes are stable so sheets can be compared across jobs.</p>
+<table class="small">
+  <tr><th style="width:26%">Code</th><th style="width:12%">Unit</th><th>Item</th></tr>
+  <tr><td>RCC-WALL / RCC-COL / RCC-BEAM / RCC-SLAB</td><td>cum</td><td>Reinforced concrete in walls, columns, beams, slabs (grade from Assumptions).</td></tr>
+  <tr><td>FW-WALL / FW-COL / FW-BEAM / FW-SLAB</td><td>sqm</td><td>Formwork (shuttering) contact area for the same members.</td></tr>
+  <tr><td>STEEL</td><td>kg</td><td>Reinforcement steel by thumb rule (basis: thumb rule).</td></tr>
+  <tr><td>BLOCK-CUM / BLOCK-SQM</td><td>cum / sqm</td><td>Block masonry: thick walls in cum, thin partitions in sqm.</td></tr>
+  <tr><td>PLASTER-INT / PLASTER-CLG</td><td>sqm</td><td>Internal wall plaster 12 mm; ceiling plaster 6 mm.</td></tr>
+  <tr><td>FLOOR-&lt;finish&gt;</td><td>sqm</td><td>Flooring, one item per finish (e.g. FLOOR-fc-201-1200x1200mm-stone).</td></tr>
+  <tr><td>SKIRT</td><td>rmt</td><td>Skirting to match flooring.</td></tr>
+  <tr><td>DADO</td><td>sqm</td><td>Wall tiles in wet areas up to the dado height.</td></tr>
+  <tr><td>PAINT-WALL / PAINT-CLG</td><td>sqm</td><td>Putty, primer and emulsion on walls / ceilings (system from the room's finish).</td></tr>
+  <tr><td>WP</td><td>sqm</td><td>Waterproofing to wet areas, floor plus 300 mm upturn.</td></tr>
+  <tr><td>DOOR-&lt;tag&gt; / WIN-&lt;tag&gt;</td><td>nos / sqm</td><td>Doors and windows, one item per tag with size and description.</td></tr>
+  <tr><td>MISC-&lt;trade&gt;-n</td><td>as given</td><td>Other countable items (joinery, electrical, plumbing, sanitary, miscellaneous).</td></tr>
+</table>
+<p class="small muted">Trades appear in this order: RCC, Masonry, Plaster, Flooring, Wall tiles, Painting, Waterproofing, Doors &amp; Windows, Joinery, Plumbing, Electrical, Sanitary, Miscellaneous.</p>
+
+<!-- ===================================================== 20 -->
+<h1><span class="num">20</span>Appendix B — Default material norms</h1>
+<p>Required material = BOQ quantity × norm × (1 + wastage %). These defaults follow common Indian estimating practice and can be changed by an admin.</p>
+<table class="small">
+  <tr><th style="width:22%">For item</th><th>Material</th><th class="r" style="width:14%">Norm per unit</th><th style="width:12%">Unit</th><th class="r" style="width:12%">Wastage</th></tr>
+  <tr><td>RCC (per cum)</td><td>Ready-mix concrete</td><td class="r">1.0</td><td>cum</td><td class="r">2 %</td></tr>
+  <tr><td>STEEL (per kg)</td><td>TMT bars Fe500D / Binding wire</td><td class="r">1.0 / 0.009</td><td>kg</td><td class="r">3 % / 0 %</td></tr>
+  <tr><td>Formwork (per sqm)</td><td>Shuttering oil</td><td class="r">0.08</td><td>litre</td><td class="r">0 %</td></tr>
+  <tr><td>Block masonry (per cum)</td><td>AAC blocks 600×200×200 / Cement (1:4) / Sand</td><td class="r">41.7 / 1.2 / 0.15</td><td>nos / bags / cum</td><td class="r">3 / 3 / 5 %</td></tr>
+  <tr><td>Block partition (per sqm)</td><td>AAC blocks 600×200×150 / Cement / Sand</td><td class="r">8.3 / 0.18 / 0.022</td><td>nos / bags / cum</td><td class="r">3 / 3 / 5 %</td></tr>
+  <tr><td>Internal plaster 12 mm (per sqm)</td><td>Cement / Sand</td><td class="r">0.105 / 0.0144</td><td>bags / cum</td><td class="r">3 / 5 %</td></tr>
+  <tr><td>Ceiling plaster 6 mm (per sqm)</td><td>Cement / Sand</td><td class="r">0.065 / 0.0075</td><td>bags / cum</td><td class="r">3 / 5 %</td></tr>
+  <tr><td>Flooring (per sqm)</td><td>Tiles or stone / Cement (20 mm bed 1:4) / Sand / Adhesive-grout</td><td class="r">1.0 / 0.16 / 0.021 / 0.5</td><td>sqm / bags / cum / kg</td><td class="r">7 / 3 / 5 / 5 %</td></tr>
+  <tr><td>Skirting (per rmt)</td><td>Skirting strips (600 mm)</td><td class="r">1.67</td><td>nos</td><td class="r">7 %</td></tr>
+  <tr><td>Dado (per sqm)</td><td>Wall tiles / Tile adhesive</td><td class="r">1.0 / 4.0</td><td>sqm / kg</td><td class="r">7 / 5 %</td></tr>
+  <tr><td>Paint (per sqm)</td><td>Wall putty / Primer / Interior emulsion</td><td class="r">1.2 / 0.08 / 0.12</td><td>kg / litre / litre</td><td class="r">5 % each</td></tr>
+  <tr><td>Waterproofing (per sqm)</td><td>Compound / membrane</td><td class="r">1.0</td><td>sqm</td><td class="r">5 %</td></tr>
+  <tr><td>Doors (per nos) / Windows (per sqm)</td><td>Door set with frame &amp; hardware / Aluminium window fabricated to size</td><td class="r">1.0</td><td>nos / sqm</td><td class="r">0 %</td></tr>
+</table>
+<p class="small muted">Steel thumb rules (kg per cum of concrete): walls 125, columns 200, beams 150, slabs 85.</p>
+
+<!-- ===================================================== 21 -->
+<div class="section"></div>
+<h1><span class="num">21</span>Appendix C — API endpoints</h1>
+<p>For integrators. All endpoints are under <code>/api/v1</code>, use JSON, and need the bearer token from <code>POST /auth/login</code>. Interactive documentation: <code>/docs</code> on the API host.</p>
+<table class="small">
+  <tr><th style="width:38%">Endpoint</th><th>Purpose</th></tr>
+  <tr><td>POST /auth/login · POST /auth/set-password · GET /me</td><td>Sign in, change password, current profile.</td></tr>
+  <tr><td>POST /jobs (multipart) · GET /jobs · GET /jobs/{id} · DELETE /jobs/{id}</td><td>Create a job with files and fields project_name, level, location; list; read; delete.</td></tr>
+  <tr><td>GET /jobs/{id}/sheets · GET …/sheets/{sid}/preview · GET …/sheets/{sid}/extraction</td><td>Sheets of a job, preview image, raw AI extraction for a sheet.</td></tr>
+  <tr><td>PUT /jobs/{id}/elements</td><td>Replace the element list (rooms, openings, walls, slabs, members, misc, assumptions) and recompute.</td></tr>
+  <tr><td>POST /jobs/{id}/reprocess · POST /jobs/{id}/recalculate</td><td>Run the pipeline again; recompute from current inputs.</td></tr>
+  <tr><td>POST /jobs/{id}/approve · POST /jobs/{id}/reject</td><td>Reviewer sign-off / send back with a reason.</td></tr>
+  <tr><td>GET /jobs/{id}/export.xlsx</td><td>Download the workbook (ready or approved jobs).</td></tr>
+  <tr><td>GET /stats · GET /system · GET /ai/status · GET /standards · PUT /standards</td><td>Dashboard counters, system info, AI status, company standards (PUT is admin).</td></tr>
+  <tr><td>GET /admin/users · POST /admin/invite · PATCH /admin/users/{uid} · POST …/reset-password · DELETE …</td><td>User management (admin).</td></tr>
+  <tr><td>GET /admin/audit · GET /admin/backup</td><td>Audit log and database backup (admin).</td></tr>
+</table>
+<p class="small muted">The structural (members / items) endpoints from the earlier release remain available for old jobs only.</p>
+
+<!-- ===================================================== 22 -->
+<h1><span class="num">22</span>Appendix D — Glossary</h1>
+<table class="kv small">
+  <tr><td>BOQ</td><td>Bill of Quantities — the list of work items with quantities (and, when priced, rates and amounts).</td></tr>
+  <tr><td>Measurement sheet</td><td>The detailed working that shows how each BOQ quantity was derived, object by object.</td></tr>
+  <tr><td>IS 1200</td><td>Indian Standard "Method of measurement of building and civil engineering works"; defines what to measure, in which unit, and which deductions to make.</td></tr>
+  <tr><td>CPWD description</td><td>The standard wording of work items used by the Central Public Works Department (e.g. "Providing and laying …").</td></tr>
+  <tr><td>Deduction</td><td>A minus row that removes the area or volume of an opening or overlap from an item.</td></tr>
+  <tr><td>Contact area</td><td>Formwork is measured by the area of shuttering in contact with concrete.</td></tr>
+  <tr><td>Thumb rule</td><td>An approximate ratio used when detailed data is not available (e.g. kg of steel per cum of concrete).</td></tr>
+  <tr><td>Norm</td><td>Standard consumption of a material per unit of work (e.g. 0.105 bags of cement per sqm of 12 mm plaster).</td></tr>
+  <tr><td>Wastage</td><td>Extra material allowed for cutting, breakage and handling, as a percentage.</td></tr>
+  <tr><td>DWG / DXF</td><td>AutoCAD drawing formats; DXF is the open text version the readers use.</td></tr>
+  <tr><td>Model space / layout</td><td>In CAD, the model space holds the real-size drawing; layouts are the plotted sheets.</td></tr>
+  <tr><td>Hatch</td><td>A filled pattern in CAD that marks an area (e.g. a floor finish zone).</td></tr>
+  <tr><td>Mivan</td><td>Aluminium-formwork construction where walls and slabs are cast in RCC monolithically.</td></tr>
+  <tr><td>Tender vs Site</td><td>Comparison of the quantities estimated at tender with those measured on site during execution.</td></tr>
+</table>
+<p class="small muted" style="margin-top:14pt">Avighna BOQ · User &amp; Operations Guide · Rev 1 · 11 October 2026 · Internal document</p>
+</body>
+</html>
