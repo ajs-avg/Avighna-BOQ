@@ -20,6 +20,13 @@ INSUNITS = {0: "unknown", 1: "in", 2: "ft", 4: "mm", 5: "cm", 6: "m", 14: "dm"}
 _DOC_CACHE: Dict[str, Drawing] = {}
 
 
+def clear_cache() -> None:
+    """Drop cached documents (big DXFs are hundreds of MB in memory)."""
+    import gc
+    _DOC_CACHE.clear()
+    gc.collect()
+
+
 def load_dxf(path: Path) -> Drawing:
     """Load (and cache) a DXF; run the auditor so dangling block references left behind by
     DWG converters (e.g. anonymous "*U" blocks) cannot break bbox/render later."""

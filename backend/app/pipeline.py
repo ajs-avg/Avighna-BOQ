@@ -26,7 +26,8 @@ from app.engine.bbs import compute_bbs
 from app.engine.boq import compute_boq
 from app.extract.detect import detect_format
 from app.extract.dwg_convert import ConversionError, convert_dwg_to_dxf
-from app.extract.dxf_reader import load_dxf, paperspace_hints, read_dxf, render_layout_png
+from app.extract.dxf_reader import clear_cache, load_dxf, paperspace_hints, read_dxf, render_layout_png
+from app.sysinfo import dxf_too_large
 from app.extract.fitout_geometry import MeasuredFacts, measure_dxf, measure_from_inventory
 from app.extract.heuristics import classify_sheet_heuristic, fitout_items_from_facts, structural_members_heuristic
 from app.extract.image_reader import read_image, render_image_png
@@ -120,6 +121,7 @@ class Pipeline:
                 self._extract_fitout(job, sheets, sources, ai)
             repo.save_sheets(job.id, [sh.record for sh in sheets])
 
+            clear_cache()
             self._event(job, JobStatus.quantifying, "Running the measurement engine", 88)
             recalculate(job)
             job.progress = 100
@@ -182,6 +184,12 @@ class Pipeline:
         s = get_settings()
         sheets: List[_Sheet] = []
         for name, kind, path in sources:
+            if kind == "dxf":
+                too_big = dxf_too_large(path.stat().st_size)
+                if too_big:
+                    job.events.append(JobEvent(at=datetime.utcnow(), status=JobStatus.analysing,
+                                               message=f"Skipped {name}: {too_big}", progress=job.progress))
+                    continue
             try:
                 if kind == "pdf":
                     invs = read_pdf(path, max_pages=s.max_pages)
@@ -221,6 +229,7 @@ class Pipeline:
                     if kind == "pdf":
                         png = render_page_png(path, inv.page_no, max_px=s.gemini_max_image_px, dpi=s.preview_dpi)
                     elif kind == "dxf":
+                        clear_cache()   # the renderer is a separate process; don't hold a second copy here
                         png = render_layout_png(path, inv.layout, max_px=s.gemini_max_image_px, dpi=s.preview_dpi)
                     else:
                         png = render_image_png(path, inv.page_no, max_px=s.gemini_max_image_px)

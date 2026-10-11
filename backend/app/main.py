@@ -20,6 +20,7 @@ from pydantic import BaseModel, Field, TypeAdapter, ValidationError
 
 from app import auth, db, repository as repo
 from app.storage import get_storage
+from app.sysinfo import max_dxf_mb, memory_limit_mb
 from app.ai.gemini import GeminiClient, ai_status
 from app.config import get_settings
 from app.extract.dwg_convert import converter_status
@@ -151,6 +152,7 @@ def system(user: UserProfile = Depends(auth.current_user)) -> Dict[str, Any]:
         "db_backend": db.backend(), "storage_backend": get_storage().backend,
         "db_mb": round(s.db_path.stat().st_size / 1e6, 2) if (db.backend() == "sqlite" and s.db_path.exists()) else 0.0,
         "data_mb": _dir_mb(s.data_dir), "worker_threads": s.worker_threads, "max_upload_mb": s.max_upload_mb,
+        "memory_limit_mb": memory_limit_mb(), "max_dxf_mb": max_dxf_mb(),
         "stats": stats, "users": repo.count_users(),
     }
 
