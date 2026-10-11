@@ -63,7 +63,7 @@ going with the other files and reports the skipped file; upload the PDF plot or 
 ## Deploy (Vercel + Render + Supabase)
 Cloud mode is switched on by environment variables only: `DATABASE_URL` (Supabase Postgres),
 `STORAGE_BACKEND=supabase` (files in Supabase Storage) and `CORS_ORIGINS` (your Vercel URL).
-`render.yaml` + `backend/Dockerfile` deploy the API on Render; the frontend deploys on Vercel with
+`render.yaml` + `Dockerfile` (repo root) deploy the API on Render; the frontend deploys on Vercel with
 root directory `frontend`. Step by step: [docs/DEPLOY.md](docs/DEPLOY.md).
 
 ## Tests

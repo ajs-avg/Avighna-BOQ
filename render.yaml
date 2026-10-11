@@ -6,7 +6,7 @@ services:
     runtime: docker
     region: singapore
     plan: starter
-    dockerfilePath: ./backend/Dockerfile
+    dockerfilePath: ./Dockerfile
     dockerContext: .
     healthCheckPath: /healthz
     autoDeploy: true
