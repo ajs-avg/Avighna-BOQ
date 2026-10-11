@@ -81,6 +81,9 @@ class Settings:
         # Web
         origins = os.getenv("CORS_ORIGINS", "http://localhost:3000")
         self.cors_origins: List[str] = [o.strip() for o in origins.split(",") if o.strip()]
+        # Regex for additional allowed origins. Default covers Vercel preview/production URLs and
+        # Render; safe because the API uses bearer tokens (no cookie auth), so CORS only gates XHR.
+        self.cors_origin_regex: str = os.getenv("CORS_ORIGIN_REGEX", r"^https://[a-z0-9-]+\.(vercel\.app|onrender\.com)$")
         self.frontend_url: str = os.getenv("FRONTEND_URL", "http://localhost:3000").rstrip("/")
         self.max_upload_mb: int = int(os.getenv("MAX_UPLOAD_MB", "200"))
         self.max_pages: int = int(os.getenv("MAX_PAGES", "150"))  # per PDF; later pages are skipped with a note

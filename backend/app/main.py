@@ -88,7 +88,8 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="Avighna BOQ API", version=VERSION, lifespan=lifespan,
               description="Drop a drawing, get a measurement sheet. Structural BBS + interior fit-out BOQ.")
-app.add_middleware(CORSMiddleware, allow_origins=get_settings().cors_origins, allow_credentials=True,
+app.add_middleware(CORSMiddleware, allow_origins=get_settings().cors_origins,
+                   allow_origin_regex=get_settings().cors_origin_regex or None, allow_credentials=True,
                    allow_methods=["*"], allow_headers=["*"], expose_headers=["Content-Disposition"])
 
 
