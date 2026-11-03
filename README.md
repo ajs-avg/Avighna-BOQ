@@ -14,8 +14,12 @@ One simple flow: **drop the drawing → measurement sheet → BOQ abstract → m
 | **Elements (from drawing)** | The rooms / openings / walls / slabs / members the AI read, with confidence and evidence, for checking |
 
 How it works: files are converted (DWG → DXF), every sheet is read (vector text, dimensions, CAD geometry such as
-room outlines, hatch areas and door tags), classified, then Gemini 2.5 Pro reads rooms, openings, walls, slabs,
-columns/beams and other items from the image plus the exact machine text. All arithmetic runs in a deterministic
+room outlines, hatch areas and door tags), classified, then read. **Structural DXF plans are read geometrically**
+(no AI guessing): exact text entities for names and sizes, column hatches, beam edge lines followed as chains
+(straight, angled and curved) and cut at the supports, the drawing's own beam/slab schedules as a second source,
+slab panels from the enclosed regions, and crossed-out / "NOT TO REFER" blocks skipped — disagreements become
+flags and a coloured check picture (validated on the Nishika Elysium 14th floor). All other sheets: Gemini 2.5 Pro
+reads rooms, openings, walls, slabs, columns/beams and other items from the image plus the exact machine text. All arithmetic runs in a deterministic
 measurement engine (IS 1200 rules, formwork contact areas, steel thumb rules, material norms); reviewers correct
 the elements in the UI, recompute, and approve before the Excel is released. The earlier structural BBS and
 KR-style fit-out BOQ engines are still in the API for old jobs but are not offered for new ones.

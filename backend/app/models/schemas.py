@@ -455,6 +455,7 @@ class SheetRecord(BaseModel):
     classification: SheetClassification
     preview_path: Optional[str] = None
     preview_full_path: Optional[str] = Field(None, description="Full-resolution render (viewer); thumb is preview_path")
+    check_picture_path: Optional[str] = Field(None, description="Coloured check picture from the structural reader")
     text_count: int = 0
     width: float = 0
     height: float = 0
@@ -655,6 +656,8 @@ class WallEl(BaseModel):
     confidence: float = 0.5
     evidence: List[str] = Field(default_factory=list)
     source_sheet: Optional[str] = None
+    outline: Optional[List[List[float]]] = Field(None, description="Drawing coordinates (mm) when read from CAD")
+    flags: List[str] = Field(default_factory=list, description="Disagreements a person should look at")
 
 
 class SlabEl(BaseModel):
@@ -669,6 +672,8 @@ class SlabEl(BaseModel):
     confidence: float = 0.5
     evidence: List[str] = Field(default_factory=list)
     source_sheet: Optional[str] = None
+    outline: Optional[List[List[float]]] = Field(None, description="Real panel outline in drawing mm (L-shapes kept)")
+    flags: List[str] = Field(default_factory=list, description="Disagreements a person should look at")
 
 
 class MemberEl(BaseModel):
@@ -685,6 +690,8 @@ class MemberEl(BaseModel):
     confidence: float = 0.5
     evidence: List[str] = Field(default_factory=list)
     source_sheet: Optional[str] = None
+    outline: Optional[List[List[float]]] = Field(None, description="Drawing coordinates (mm) when read from CAD")
+    flags: List[str] = Field(default_factory=list, description="Disagreements a person should look at")
 
 
 class MiscEl(BaseModel):
