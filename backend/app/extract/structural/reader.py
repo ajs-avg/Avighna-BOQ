@@ -160,6 +160,17 @@ def structural_to_measurement(res: StructuralReadResult, source_sheet: str, leve
                                source_sheet=source_sheet,
                                outline=[list(q) for q in s.poly], flags=list(s.flags)))
 
+    # The sheet merge dedupes elements by (tag, level): a second piece of the same
+    # beam, or a second panel of the same slab mark, must keep its own row, so
+    # repeated tags get a visible suffix.
+    for lst in (ex.members, ex.walls, ex.slabs):
+        seen: Dict[str, int] = {}
+        for el in lst:
+            n = seen.get(el.tag, 0) + 1
+            seen[el.tag] = n
+            if n > 1:
+                el.tag = f"{el.tag} ({n})"
+
     ex.warnings += res.warnings
     for n, why in res.beam_fails.items():
         ex.warnings.append(f"beam {n}: {why}")

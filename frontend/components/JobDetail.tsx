@@ -38,6 +38,7 @@ import { ElementsTab } from "./measurement/ElementsTab";
 import { MaterialsTab } from "./measurement/MaterialsTab";
 import { MeasurementBOQTab } from "./measurement/MeasurementBOQTab";
 import { MeasurementSheetTab } from "./measurement/MeasurementSheetTab";
+import { ReviewTab, reviewAttentionCount } from "./measurement/ReviewTab";
 import { RoomWiseTab } from "./measurement/RoomWiseTab";
 import { countElements, lowConfidenceCount } from "./measurement/elementForms";
 import { MemberTab } from "./structural/MemberTab";
@@ -55,7 +56,7 @@ import { StatusPill } from "./ui/StatusPill";
 import { Tabs, type TabItem } from "./ui/Tabs";
 import { useToast } from "./ui/Toast";
 
-type TabKey = "summary" | MemberKind | "sheets" | "boq" | "rooms" | "measure" | "materials" | "roomwise" | "elements";
+type TabKey = "summary" | MemberKind | "sheets" | "boq" | "rooms" | "review" | "measure" | "materials" | "roomwise" | "elements";
 type Action = "reprocess" | "recalculate" | "approve" | "download";
 
 export function JobDetail({ id }: { id: string }) {
@@ -214,11 +215,12 @@ export function JobDetail({ id }: { id: string }) {
   const readOnly = processing || job.status === "approved";
   const isMeasurement = job.module === "measurement";
   const moduleMeta = MODULE_META[job.module];
-  const tab: TabKey = tabChoice ?? (isMeasurement ? "measure" : "summary");
+  const tab: TabKey = tabChoice ?? (isMeasurement ? "review" : "summary");
   const setTab = (k: TabKey) => setTabChoice(k);
 
   const tabs: TabItem<TabKey>[] = isMeasurement
     ? [
+        { key: "review", label: "Review", count: reviewAttentionCount(job.elements) },
         { key: "measure", label: "Measurement Sheet", count: job.measurement?.blocks.length ?? 0 },
         { key: "boq", label: "BOQ", count: job.measurement?.boq.length ?? 0 },
         { key: "materials", label: "Materials", count: job.measurement?.materials.length ?? 0 },
@@ -380,6 +382,7 @@ export function JobDetail({ id }: { id: string }) {
         <div className="min-w-0">
           <Tabs items={tabs} value={tab} onChange={(k) => setTab(k)} className="mb-5" />
 
+          {isMeasurement && tab === "review" ? (processing ? <PendingPanel job={job} /> : <ReviewTab key={`${job.id}-${job.updated_at}`} job={job} />) : null}
           {isMeasurement && tab === "measure" ? job.measurement ? <MeasurementSheetTab measurement={job.measurement} /> : <PendingPanel job={job} /> : null}
           {isMeasurement && tab === "boq" ? job.measurement ? <MeasurementBOQTab boq={job.measurement.boq} /> : <PendingPanel job={job} /> : null}
           {isMeasurement && tab === "materials" ? job.measurement ? <MaterialsTab materials={job.measurement.materials} /> : <PendingPanel job={job} /> : null}
