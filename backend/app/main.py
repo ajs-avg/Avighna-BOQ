@@ -364,16 +364,21 @@ def get_sheet_extraction(job_id: str, sheet_id: str, _: UserProfile = Depends(au
 
 
 @app.get("/api/v1/jobs/{job_id}/sheets/{sheet_id}/preview")
-def get_preview(job_id: str, sheet_id: str, size: str = Query("thumb", pattern="^(thumb|full)$"),
+def get_preview(job_id: str, sheet_id: str, size: str = Query("thumb", pattern="^(thumb|full|check)$"),
                 _: UserProfile = Depends(auth.current_user)):
     """`size=thumb` (default) is the 1600 px image; `size=full` is the full-resolution render when the
-    job has one (falls back to the thumb for jobs processed before full renders were kept)."""
+    job has one (falls back to the thumb for jobs processed before full renders were kept);
+    `size=check` is the structural reader's coloured check picture when the sheet has one."""
     sh = repo.get_sheet(job_id, sheet_id)
     if sh is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Preview not available")
     stg = get_storage()
     local = None
-    if size == "full" and sh.preview_full_path:
+    if size == "check":
+        if not sh.check_picture_path:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, "No check picture for this sheet")
+        local = stg.resolve(sh.check_picture_path)
+    elif size == "full" and sh.preview_full_path:
         local = stg.resolve(sh.preview_full_path)
     if local is None:
         local = stg.resolve(sh.preview_path)

@@ -440,6 +440,37 @@ class Pipeline:
 
 
     # ------------------------------------------------------------------ stage 4c: measurement (the product)
+    def _read_structural_sheet(self, job: JobRecord, sh: _Sheet, level: str) -> Optional[MeasurementExtraction]:
+        """Geometric read of a structural DXF plan. Returns None when the sheet does
+        not yield enough members (then the AI path is used instead)."""
+        from app.extract.structural import read_structural_dxf, structural_to_measurement
+        from app.extract.structural.check_picture import render_check_picture
+        try:
+            res = read_structural_dxf(sh.path)
+        except Exception as exc:  # noqa: BLE001
+            sh.record.processing_notes.append(f"structural reader failed, AI fallback used: {exc}")
+            self._note(job, f"{sh.label}: structural reader failed ({str(exc)[:120]}); AI fallback used")
+            return None
+        if res.member_count() < 5:
+            sh.record.processing_notes.append(
+                f"structural reader found only {res.member_count()} members; AI fallback used")
+            return None
+        part = structural_to_measurement(res, sh.label, level=level)
+        self._note(job, f"{sh.label}: structural reader: {res.summary()}")
+        try:
+            png = render_check_picture(res)
+            if png:
+                previews = get_settings().data_dir / "previews" / job.id
+                previews.mkdir(parents=True, exist_ok=True)
+                cp = previews / f"{sh.record.id}.check.png"
+                cp.write_bytes(png)
+                sh.record.check_picture_path = get_storage().store(
+                    cp, "previews", f"{job.id}/{sh.record.id}.check.png")
+                self._note(job, f"{sh.label}: check picture rendered (open the sheet preview with size=check)")
+        except Exception as exc:  # noqa: BLE001
+            sh.record.processing_notes.append(f"check picture failed: {exc}")
+        return part
+
     def _extract_measurement(self, job: JobRecord, sheets: List[_Sheet], sources: List[Tuple[str, str, Path]],
                              ai: GeminiClient) -> None:
         dxf_by_stem: Dict[str, Path] = {p.stem.lower(): p for (_n, k, p) in sources if k == "dxf"}
@@ -463,7 +494,14 @@ class Pipeline:
             c = sh.record.classification
             part: Optional[MeasurementExtraction] = None
             facts_txt = sh.facts.to_prompt_text() if sh.facts else "(none)"
-            if ai.enabled:
+            # Structural DXF plans are read from the CAD geometry itself (exact text,
+            # column hatches, beam line chains, the schedule as a second source),
+            # not by the AI looking at a picture. Gemini stays for everything else.
+            if sh.kind == "dxf" and sh.record.layout == "Model" and (
+                    c.discipline == "structural"
+                    or c.sheet_type in ("framing_plan", "beam_plan", "column_plan", "slab_plan")):
+                part = self._read_structural_sheet(job, sh, c.level or "")
+            if part is None and ai.enabled:
                 if not sh.hi_png:  # preview failed: still read from the machine text + CAD facts
                     self._note(job, f"{sh.label}: no preview image, AI reads the vector text and CAD facts only")
                 try:
