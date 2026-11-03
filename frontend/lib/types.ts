@@ -502,6 +502,10 @@ export interface ElBase {
   confidence: number;
   evidence: string[];
   source_sheet?: string | null;
+  /** Drawing coordinates (mm) when the element was read from CAD geometry. */
+  outline?: number[][] | null;
+  /** Disagreements a person should look at (plan vs schedule, defaults applied...). */
+  flags?: string[];
 }
 
 export interface RoomEl extends ElBase {
@@ -760,6 +764,8 @@ export interface SheetRecord {
   preview_path?: string | null;
   /** Full-resolution render (up to ~4500 px) served by `?size=full`; null/absent on jobs processed before it existed. */
   preview_full_path?: string | null;
+  /** Coloured check picture from the structural reader, served by `?size=check`. */
+  check_picture_path?: string | null;
   text_count: number;
   width: number;
   height: number;

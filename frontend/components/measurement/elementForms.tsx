@@ -44,8 +44,10 @@ import { Switch } from "../ui/Switch";
 export type Num = number | "";
 export type DraftValue = string | number | boolean | null | undefined | string[];
 export type DraftRecord = Record<string, DraftValue>;
-/** Element → form draft: every number (nullable ones included) becomes `number | ""` while typing. */
-export type Draft<T> = { [K in keyof T]-?: NonNullable<T[K]> extends number ? Num : T[K] };
+/** Element → form draft: every number (nullable ones included) becomes `number | ""` while typing.
+ * The CAD-only fields (outline geometry, reader flags) are not editable in a form; an element
+ * saved from a draft drops them, which is right — a hand-corrected element supersedes its flags. */
+export type Draft<T> = { [K in keyof Omit<T, "outline" | "flags">]-?: NonNullable<Omit<T, "outline" | "flags">[K]> extends number ? Num : Omit<T, "outline" | "flags">[K] };
 type KeysOfType<T, V> = { [K in keyof T]-?: T[K] extends V ? K : never }[keyof T];
 
 export type ListName = "rooms" | "levels" | "walls" | "trades";
