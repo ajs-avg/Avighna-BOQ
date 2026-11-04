@@ -25,10 +25,12 @@ from app.ai.gemini import GeminiClient, ai_status
 from app.config import get_settings
 from app.extract.dwg_convert import converter_status
 from app.models.schemas import (
-    AIStatus, CreateJobResponse, FitoutItem, InviteRequest, InviteResponse, ItemUpdate, JobEvent, JobRecord,
-    ElementsUpdate, JobStatus, LoginRequest, MeasurementExtraction, MemberSpec, MemberUpdate, Module, RoleUpdate,
-    SetPasswordRequest, SheetRecord, SourceFile, Standards, TokenResponse, UserProfile, new_id,
+    AIStatus, AnswerRequest, CreateJobResponse, FitoutItem, InterpretRequest, Interpretation, InviteRequest,
+    InviteResponse, ItemUpdate, JobEvent, JobRecord, ElementsUpdate, JobStatus, LoginRequest, MeasurementExtraction,
+    MemberSpec, MemberUpdate, Module, ReviewQuestion, RoleUpdate, SetPasswordRequest, SheetRecord, SourceFile,
+    Standards, TokenResponse, UserProfile, new_id,
 )
+from app.decisions import QuestionError, apply_answer, interpret, resolve_edited_questions, undo_decision
 from app.engine.measurement import compute_measurement
 from app.pipeline import Pipeline, recalculate
 
@@ -523,8 +525,69 @@ def put_elements(job_id: str, body: ElementsUpdate = Body(...), user: UserProfil
             if e.confidence < 1.0 and not any(v.startswith("edited by") for v in e.evidence):
                 continue
     job.elements = ex
+    resolve_edited_questions(job)
     db.audit("elements.update", user.email, job.id, f"{ex.count()} elements")
     return _recalc_and_save(job, user, "elements edited")
+
+
+# ----------------------------------------------------------------------------- review questions
+def _question(job: JobRecord, qid: str) -> ReviewQuestion:
+    for q in job.questions:
+        if q.id == qid:
+            return q
+    raise HTTPException(status.HTTP_404_NOT_FOUND, "Question not found")
+
+
+@app.get("/api/v1/jobs/{job_id}/questions/{question_id}/picture")
+def question_picture(job_id: str, question_id: str, _: UserProfile = Depends(auth.current_user)):
+    """The crop of the drawing around the part the question asks about, that part highlighted."""
+    q = _question(_load_job(job_id), question_id)
+    local = get_storage().resolve(q.picture_path) if q.picture_path else None
+    if local is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "No picture for this question")
+    return FileResponse(str(local), media_type="image/png", headers={"Cache-Control": "private, max-age=3600"})
+
+
+@app.post("/api/v1/jobs/{job_id}/questions/{question_id}/interpret", response_model=Interpretation)
+def interpret_answer(job_id: str, question_id: str, body: InterpretRequest,
+                     _: UserProfile = Depends(auth.current_user)) -> Interpretation:
+    """Turn a typed answer into one of the question's options (or typed numbers) and say back
+    what was understood. Changes nothing: the person confirms with POST .../answer."""
+    q = _question(_load_job(job_id), question_id)
+    return interpret(q, body.text, GeminiClient.get())
+
+
+@app.post("/api/v1/jobs/{job_id}/questions/{question_id}/answer", response_model=JobRecord)
+def answer_question(job_id: str, question_id: str, body: AnswerRequest,
+                    user: UserProfile = Depends(auth.current_user)) -> JobRecord:
+    """Apply a confirmed answer: the elements change, the decision is recorded (who, when, the
+    exact words, every value changed), and the quantities are recomputed."""
+    job = _load_job(job_id)
+    _require_editable(job)
+    q = _question(job, question_id)
+    try:
+        d = apply_answer(job, q, body, user.email)
+    except QuestionError as exc:
+        raise HTTPException(status.HTTP_409_CONFLICT if "already answered" in str(exc) else status.HTTP_422_UNPROCESSABLE_ENTITY, str(exc))
+    _event(job, job.status, f"Decision by {user.email} on \"{q.title}\": {d.understood_as}")
+    db.audit("question.answer", user.email, job.id, f"{q.key}: {d.understood_as} | said: {d.answer_text[:300]}")
+    return _recalc_and_save(job, user, f"decision on {q.topic.lower()}")
+
+
+@app.post("/api/v1/jobs/{job_id}/decisions/{decision_id}/undo", response_model=JobRecord)
+def undo_answer(job_id: str, decision_id: str, user: UserProfile = Depends(auth.current_user)) -> JobRecord:
+    job = _load_job(job_id)
+    _require_editable(job)
+    d = next((x for x in job.decisions if x.id == decision_id), None)
+    if d is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Decision not found")
+    try:
+        undo_decision(job, d, user.email)
+    except QuestionError as exc:
+        raise HTTPException(status.HTTP_409_CONFLICT, str(exc))
+    _event(job, job.status, f"Decision undone by {user.email}: {d.understood_as}")
+    db.audit("question.undo", user.email, job.id, d.understood_as)
+    return _recalc_and_save(job, user, "decision undone")
 
 
 class RecalcRequest(BaseModel):

@@ -13,6 +13,7 @@ from typing import Dict, List, Optional, Tuple
 
 from app import db, repository as repo
 from app.ai.gemini import GeminiClient, GeminiUnavailable
+from app.decisions import reapply_decisions
 from app.storage import get_storage
 from app.ai.mappers import (
     classification_from_ai, fitout_from_ai, measurement_from_ai, merge_fitout, merge_measurement,
@@ -39,7 +40,7 @@ from app.extract.inventory import SheetInventory
 from app.extract.pdf_reader import read_pdf, render_page_png, title_block_hints
 from app.extract.tables import reconstruct_tables, tables_to_prompt
 from app.models.schemas import (
-    FitoutExtraction, JobEvent, JobRecord, JobStatus, MeasurementExtraction, Module, SheetRecord,
+    FitoutExtraction, JobEvent, JobRecord, JobStatus, MeasurementExtraction, Module, ReviewQuestion, SheetRecord,
     StructuralExtraction, new_id,
 )
 
@@ -57,6 +58,7 @@ class _Sheet:
         self.hi_png: Optional[bytes] = None
         self.facts: Optional[MeasuredFacts] = None
         self.hints: List[str] = []   # paperspace / title-block strings (DXF)
+        self.questions: List[ReviewQuestion] = []   # review questions from the structural reader
 
     def title_hints(self) -> List[str]:
         return (self.hints + title_block_hints(self.inv))[:200]
@@ -469,6 +471,21 @@ class Pipeline:
                 self._note(job, f"{sh.label}: check picture rendered (open the sheet preview with size=check)")
         except Exception as exc:  # noqa: BLE001
             sh.record.processing_notes.append(f"check picture failed: {exc}")
+        # Every disagreement and open measuring rule becomes a question, with a crop of
+        # the drawing around the part it asks about.
+        try:
+            from app.extract.structural.questions import build_questions
+            qdir = get_settings().data_dir / "previews" / job.id
+            qdir.mkdir(parents=True, exist_ok=True)
+            for q, qpng in build_questions(res, part, sh.label):
+                if qpng:
+                    qp = qdir / f"q-{q.id}.png"
+                    qp.write_bytes(qpng)
+                    q.picture_path = get_storage().store(qp, "previews", f"{job.id}/q-{q.id}.png")
+                sh.questions.append(q)
+        except Exception as exc:  # noqa: BLE001 - questions are help, never a reason to fail the read
+            log.warning("review questions failed for %s: %s", sh.label, exc)
+            sh.record.processing_notes.append(f"review questions failed: {exc}")
         return part
 
     def _extract_measurement(self, job: JobRecord, sheets: List[_Sheet], sources: List[Tuple[str, str, Path]],
@@ -500,7 +517,7 @@ class Pipeline:
             if sh.kind == "dxf" and sh.record.layout == "Model" and (
                     c.discipline == "structural"
                     or c.sheet_type in ("framing_plan", "beam_plan", "column_plan", "slab_plan")):
-                part = self._read_structural_sheet(job, sh, c.level or "")
+                part = self._read_structural_sheet(job, sh, job.level or c.level or "")
             if part is None and ai.enabled:
                 if not sh.hi_png:  # preview failed: still read from the machine text + CAD facts
                     self._note(job, f"{sh.label}: no preview image, AI reads the vector text and CAD facts only")
@@ -530,6 +547,17 @@ class Pipeline:
                         45 + int(40 * (i + 1) / max(n, 1)))
         merged = merge_measurement(parts)
         job.elements = merged
+        # Questions whose elements survived the merge; then earlier answers are applied again
+        # (a re-read must not throw away what a person already decided).
+        alive = {e.id for e in list(merged.members) + list(merged.walls) + list(merged.slabs)}
+        job.questions = [q for sh in relevant for q in sh.questions if all(i in alive for i in q.element_ids)]
+        if job.questions:
+            n_rule = sum(1 for q in job.questions if q.kind == "rule")
+            self._event(job, JobStatus.extracting,
+                        f"{len(job.questions)} question(s) for the reviewer ({n_rule} measuring rule(s)) — see the Review tab",
+                        job.progress)
+        for line in reapply_decisions(job):
+            self._event(job, JobStatus.extracting, line, job.progress)
         for w in merged.warnings[:20]:
             job.events.append(JobEvent(at=datetime.utcnow(), status=JobStatus.extracting, message=w, progress=job.progress))
         if merged.count() == 0:

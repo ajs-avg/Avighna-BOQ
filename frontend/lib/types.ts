@@ -558,6 +558,8 @@ export interface SlabEl extends ElBase {
   count: number;
   level: string;
   beam_width_m: number;
+  /** False for concrete with nothing underneath to shutter (the IS 1200 slab strip over beams). */
+  soffit_formwork?: boolean;
 }
 
 export interface MemberEl extends ElBase {
@@ -803,6 +805,10 @@ export interface JobRecord {
   boq?: BOQResult | null;
   /** Measurement module: what was read from the drawings (editable via PUT /elements). */
   elements?: MeasurementExtraction | null;
+  /** Review questions raised by the reader (disagreements, open measuring rules). */
+  questions?: ReviewQuestion[];
+  /** Confirmed answers, newest last; kept across reprocess and re-applied. */
+  decisions?: Decision[];
   /** Measurement module: computed sheet, BOQ abstract and materials. */
   measurement?: MeasurementResult | null;
   general_notes: GeneralNotes;
@@ -847,4 +853,99 @@ export interface CreateJobResponse {
 
 export interface ApiErrorBody {
   detail: string;
+}
+
+// ---- review questions & decisions ----------------------------------------
+// The reader turns each disagreement or open measuring rule into a plain question
+// with a highlighted crop of the drawing. A typed answer is only interpreted and
+// restated; nothing changes until the person confirms.
+
+export type ElementField = "width_m" | "depth_m" | "length_m" | "thickness_m" | "slab_thickness_m" | "height_m";
+export type ElementListName = "members" | "walls" | "slabs";
+
+export interface QuestionOption {
+  id: string;
+  label: string;
+  detail: string;
+  current: boolean;
+  recommended: boolean;
+}
+
+export interface CustomField {
+  field: ElementField;
+  label: string;
+  unit: string;
+  min_mm: number;
+  max_mm: number;
+}
+
+export interface QuestionCustom {
+  prompt: string;
+  fields: CustomField[];
+  mode: "set" | "shorten";
+  element_ids: string[];
+  list_name: ElementListName;
+}
+
+export interface ReviewQuestion {
+  id: string;
+  key: string;
+  kind: "element" | "rule";
+  topic: string;
+  title: string;
+  question: string;
+  why: string;
+  element_ids: string[];
+  element_tags: string[];
+  options: QuestionOption[];
+  custom?: QuestionCustom | null;
+  picture_path?: string | null;
+  source_sheet?: string | null;
+  status: "open" | "answered" | "resolved_by_edit";
+  decision_id?: string | null;
+}
+
+export interface AppliedChange {
+  element_id: string;
+  list_name: ElementListName;
+  tag: string;
+  field?: string | null;
+  before?: number | null;
+  after?: number | null;
+  added: boolean;
+  removed?: Record<string, unknown> | null;
+}
+
+export interface Decision {
+  id: string;
+  question_id: string;
+  question_key: string;
+  option_id?: string | null;
+  custom_values: Record<string, number>;
+  answer_text: string;
+  understood_as: string;
+  interpreted_by: "button" | "ai" | "rules";
+  applied: AppliedChange[];
+  decided_by: string;
+  decided_at: string;
+  undone: boolean;
+  undone_by?: string | null;
+  undone_at?: string | null;
+}
+
+export interface Interpretation {
+  understood: boolean;
+  option_id?: string | null;
+  custom_values: Record<string, number>;
+  understood_as: string;
+  message: string;
+  via: "ai" | "rules";
+}
+
+export interface AnswerBody {
+  option_id?: string | null;
+  custom_values?: Record<string, number>;
+  answer_text: string;
+  understood_as: string;
+  interpreted_by: "button" | "ai" | "rules";
 }

@@ -37,6 +37,10 @@ class BeamResult:
     size_source: str = "schedule"   # schedule | plan label | U.N.O. default
     flags: List[str] = field(default_factory=list)
     geom: List[Tuple[float, float]] = field(default_factory=list)
+    uid: str = ""                   # unique per piece ("BKT#2"), names repeat
+    # junction trims applied to this piece: {other, kind: "T"|"corner", end: "a"|"b",
+    # inside: mm cut off this beam, other_inside: mm of the other beam inside this one's band}
+    junctions: List[dict] = field(default_factory=list)
 
 
 @dataclass
@@ -293,7 +297,7 @@ def find_beams(prims: Sequence[Prim], columns: Sequence[ColumnHatch], texts: Seq
         pcs = pieces_of(cen, W)
         piece = min(pcs, key=lambda g: g.distance(p))
         results.setdefault(name, []).append(dict(
-            name=name, W=W, D=(row.D if row else (plan[1] if plan else cfg.default_beam_size[1])),
+            uid=f"{name}#{len(results.get(name, []))}", name=name, W=W, D=(row.D if row else (plan[1] if plan else cfg.default_beam_size[1])),
             kind=row.kind if row else "", size_source=size_source,
             piece=piece, p=p, t=t, yellow=best.yellow,
             flags=preflags + ([flag] if flag else [])))
@@ -396,6 +400,7 @@ def find_beams(prims: Sequence[Prim], columns: Sequence[ColumnHatch], texts: Seq
         if x.length < 200:
             continue
         a, b = 0.0, x.length
+        evs: List[dict] = []
         for q in final:
             if q is r:
                 continue
@@ -414,17 +419,23 @@ def find_beams(prims: Sequence[Prim], columns: Sequence[ColumnHatch], texts: Seq
                     corner_and_longer = (not through) and x.length > y.length and not q["flags"]
                     if through or corner_and_longer:
                         inside = x.intersection(band).length
+                        evs.append(dict(other=q["uid"], other_name=q["name"], kind="T" if through else "corner",
+                                        end=end, inside=round(inside),
+                                        other_inside=0 if through else round(y.intersection(x.buffer(r["W"] / 2)).length),
+                                        at=(round(E.x), round(E.y))))
                         if end == "a":
                             a = max(a, inside)
                         else:
                             b = min(b, x.length - inside)
         if (a > 0 or b < x.length) and b - a >= 0.5 * x.length and b - a > cfg.min_beam_len:
             r["piece"] = substring(x, a, b)
+            r["junctions"] = evs
 
     out: Dict[str, List[BeamResult]] = {}
     for nm, v in results.items():
         out[nm] = [BeamResult(name=nm, width=int(r["W"]), depth=r["D"], length_mm=round(r["piece"].length),
                               curved=not _straight(r["piece"]), edge=not r["yellow"], kind=r["kind"],
                               size_source=r["size_source"], flags=list(r["flags"]),
-                              geom=list(r["piece"].coords)) for r in v]
+                              geom=list(r["piece"].coords), uid=r["uid"],
+                              junctions=list(r.get("junctions", []))) for r in v]
     return out, fails

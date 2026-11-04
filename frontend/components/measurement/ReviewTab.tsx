@@ -6,22 +6,31 @@ import { getPreviewBlobUrl, getSheets } from "@/lib/api";
 import type { ElBase, JobRecord, MemberEl, MeasurementExtraction, SheetRecord, SlabEl, WallEl } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { EvidenceButton } from "./EvidenceButton";
+import { DecisionsPanel, QuestionsPanel, openQuestions } from "./QuestionsPanel";
 import { Card, CardBody, CardHeader } from "../ui/Card";
 import { Skeleton } from "../ui/Skeleton";
 
 /**
  * The Review tab: the whole floor at a glance, in plain words.
  *
- * 1. The coloured check picture (green = read cleanly, amber = flagged) when the
- *    structural reader produced one; otherwise the sheet preview.
- * 2. "Needs your look": every flagged element with its reason, first.
- * 3. Section-wise detail: columns & walls, beams, slabs — name, size, length, state.
+ * 1. Questions for you: every disagreement or open measuring rule, each with a crop of
+ *    the drawing where the part in question is lit up; answer with a button or in words.
+ * 2. The coloured check picture of the whole floor (green = read cleanly, amber = flagged).
+ * 3. Decisions made, with who / when / their words, and undo.
+ * 4. Section-wise detail: columns & walls, beams, slabs — name, size, length, state.
+ * Jobs read before questions existed show the older "Needs your look" list instead.
  */
 
 const flagsOf = (e: ElBase): string[] => e.flags ?? [];
 const needsLook = (e: ElBase): boolean => flagsOf(e).length > 0 || e.confidence < 0.6;
 
-export function reviewAttentionCount(ex: MeasurementExtraction | null | undefined): number {
+/** The number on the Review tab: open questions, or (older jobs) flagged elements. */
+export function reviewAttentionCount(job: JobRecord): number {
+  if ((job.questions ?? []).length) return openQuestions(job).length;
+  return flaggedCount(job.elements);
+}
+
+function flaggedCount(ex: MeasurementExtraction | null | undefined): number {
   if (!ex) return 0;
   const lists: ElBase[][] = [ex.rooms, ex.openings, ex.walls, ex.slabs, ex.members, ex.misc];
   return lists.reduce((n, l) => n + l.filter(needsLook).length, 0);
@@ -182,8 +191,19 @@ function Table({ head, rows }: { head: string[]; rows: ReactNode[][] }) {
   );
 }
 
-export function ReviewTab({ job }: { job: JobRecord }) {
+export function ReviewTab({
+  job,
+  onJobUpdate,
+  readOnly = false,
+  readOnlyReason,
+}: {
+  job: JobRecord;
+  onJobUpdate: (j: JobRecord) => void;
+  readOnly?: boolean;
+  readOnlyReason?: string | null;
+}) {
   const ex = job.elements;
+  const hasQuestions = (job.questions ?? []).length > 0;
   const walls = useMemo(() => [...(ex?.walls ?? [])].sort((a, b) => naturalCompare(a.tag, b.tag)), [ex]);
   const columns = useMemo(() => (ex?.members ?? []).filter((m) => m.kind === "column").sort((a, b) => naturalCompare(a.tag, b.tag)), [ex]);
   const beams = useMemo(() => (ex?.members ?? []).filter((m) => m.kind === "beam").sort((a, b) => naturalCompare(a.tag, b.tag)), [ex]);
@@ -215,14 +235,23 @@ export function ReviewTab({ job }: { job: JobRecord }) {
         <Stat value={columns.length + walls.length} label="Columns & walls" />
         <Stat value={beams.length} label="Beams" />
         <Stat value={slabs.length} label="Slabs" />
-        <Stat value={flagged.length} label="Need your look" tone="warning" />
+        {hasQuestions ? (
+          <Stat value={openQuestions(job).length} label="Questions for you" tone="warning" />
+        ) : (
+          <Stat value={flagged.length} label="Need your look" tone="warning" />
+        )}
       </div>
 
-      {/* 2 — the drawing itself, coloured */}
+      {/* 1 — questions, each with its own highlighted crop of the drawing */}
+      {hasQuestions ? <QuestionsPanel job={job} readOnly={readOnly} readOnlyReason={readOnlyReason} onJobUpdate={onJobUpdate} /> : null}
+
+      {/* 2 — the whole floor, coloured */}
       <CheckPicture job={job} />
 
-      {/* 3 — flagged first */}
-      {flagged.length > 0 ? (
+      {/* 3 — decisions made (or, for older jobs, the flagged list) */}
+      {hasQuestions ? (
+        <DecisionsPanel job={job} readOnly={readOnly} onJobUpdate={onJobUpdate} />
+      ) : flagged.length > 0 ? (
         <Card className="border-warning/40">
           <CardHeader
             title={`Needs your look (${flagged.length})`}

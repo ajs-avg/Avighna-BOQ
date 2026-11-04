@@ -455,8 +455,8 @@ export const SLAB_DEF: KindDef<SlabEl, SlabDraft> = {
   singular: "slab",
   plural: "Slabs",
   fields: SLAB_FIELDS,
-  blankDraft: (ctx) => ({ ...manualBase(), tag: "S1", length_m: "", width_m: "", thickness_m: ctx.assumptions.slab_thickness_m, count: 1, level: ctx.level, beam_width_m: 0.23 }),
-  toDraft: (el) => ({ ...el, source_sheet: el.source_sheet ?? null }),
+  blankDraft: (ctx) => ({ ...manualBase(), tag: "S1", length_m: "", width_m: "", thickness_m: ctx.assumptions.slab_thickness_m, count: 1, level: ctx.level, beam_width_m: 0.23, soffit_formwork: true }),
+  toDraft: (el) => ({ ...el, source_sheet: el.source_sheet ?? null, soffit_formwork: el.soffit_formwork ?? true }),
   fromDraft: (d) => ({
     id: d.id,
     confidence: num(d.confidence, 1),
@@ -469,6 +469,7 @@ export const SLAB_DEF: KindDef<SlabEl, SlabDraft> = {
     count: Math.max(1, Math.round(num(d.count, 1))),
     level: str(d.level),
     beam_width_m: num(d.beam_width_m),
+    soffit_formwork: d.soffit_formwork,
   }),
   labelOf: (el) => el.tag,
 };

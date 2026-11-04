@@ -34,6 +34,14 @@ class StructuralReadResult:
     region: Optional[List[float]] = None
     excluded_boxes: List[Tuple[float, float, float, float]] = field(default_factory=list)
     warnings: List[str] = field(default_factory=list)
+    # Kept in memory (never stored) so review questions can draw a crop of the real
+    # linework around the part they ask about.
+    plan_prims: list = field(default_factory=list, repr=False)
+    plan_texts: list = field(default_factory=list, repr=False)
+    hatches: list = field(default_factory=list, repr=False)
+    # reader object -> element id, filled by structural_to_measurement
+    # ("beam:B63#0", "col:3", "slab:7")
+    element_ids: Dict[str, str] = field(default_factory=dict)
 
     def member_count(self) -> int:
         return len(self.columns) + len(self.beams)
@@ -74,6 +82,7 @@ def read_structural_dxf(path, cfg: StructuralConfig = DEFAULT_CONFIG) -> Structu
     plan_texts = [t for t in raw.texts if on_plan(t)]
     plan_prims = [p for p in raw.prims
                   if not in_any_box(*(p.a if p.kind == "line" else p.c), boxes)]
+    res.plan_texts, res.plan_prims, res.hatches = plan_texts, plan_prims, raw.columns
 
     res.schedule = parse_beam_schedule(raw.texts, raw.region, boxes)
     res.warnings += res.schedule.notes
@@ -110,7 +119,7 @@ def structural_to_measurement(res: StructuralReadResult, source_sheet: str, leve
     ex.assumptions.floor_height_m = floor_height_m
     ex.assumptions.notes.append("structural reader: exact sizes from the DXF; heights assumed")
 
-    for c in res.columns:
+    for ci, c in enumerate(res.columns):
         name = c.name or "?"
         w_mm, l_mm = (c.size if c.size else c.measured)
         conf = 0.95 if c.ok else 0.6
@@ -119,17 +128,20 @@ def structural_to_measurement(res: StructuralReadResult, source_sheet: str, leve
         if c.kind != "column/wall":
             ev.append(c.kind)
         if name.startswith(("L", "W")) and not name.startswith("W?"):
-            ex.walls.append(WallEl(tag=name, wall_type="rcc", length_m=l_mm / 1000, thickness_m=w_mm / 1000,
+            el = WallEl(tag=name, wall_type="rcc", length_m=l_mm / 1000, thickness_m=w_mm / 1000,
                                    height_m=floor_height_m, level=level, confidence=conf, evidence=ev,
                                    source_sheet=source_sheet,
                                    outline=[list(q) for pl in c.polys[:1] for q in pl],
-                                   flags=list(c.flags)))
+                                   flags=list(c.flags))
+            ex.walls.append(el)
         else:
-            ex.members.append(MemberEl(tag=name, kind="column", width_m=w_mm / 1000, depth_m=l_mm / 1000,
-                                       length_m=floor_height_m, level=level, confidence=conf, evidence=ev,
-                                       source_sheet=source_sheet,
-                                       outline=[list(q) for pl in c.polys[:1] for q in pl],
-                                       flags=list(c.flags)))
+            el = MemberEl(tag=name, kind="column", width_m=w_mm / 1000, depth_m=l_mm / 1000,
+                          length_m=floor_height_m, level=level, confidence=conf, evidence=ev,
+                          source_sheet=source_sheet,
+                          outline=[list(q) for pl in c.polys[:1] for q in pl],
+                          flags=list(c.flags))
+            ex.members.append(el)
+        res.element_ids[f"col:{ci}"] = el.id
 
     for name, pieces in res.beams.items():
         for b in pieces:
@@ -138,13 +150,15 @@ def structural_to_measurement(res: StructuralReadResult, source_sheet: str, leve
                   + (" (curved)" if b.curved else "")] + b.flags
             if b.kind:
                 ev.append(b.kind)
-            ex.members.append(MemberEl(tag=name, kind="beam", width_m=b.width / 1000,
-                                       depth_m=(b.depth or 750) / 1000, length_m=length, level=level,
-                                       confidence=0.7 if b.flags else 0.95, evidence=ev,
-                                       source_sheet=source_sheet,
-                                       outline=[list(q) for q in b.geom], flags=list(b.flags)))
+            el = MemberEl(tag=name, kind="beam", width_m=b.width / 1000,
+                          depth_m=(b.depth or 750) / 1000, length_m=length, level=level,
+                          confidence=0.7 if b.flags else 0.95, evidence=ev,
+                          source_sheet=source_sheet,
+                          outline=[list(q) for q in b.geom], flags=list(b.flags))
+            ex.members.append(el)
+            res.element_ids[f"beam:{b.uid}"] = el.id
 
-    for s in res.slabs:
+    for si, s in enumerate(res.slabs):
         if not s.found:
             ex.warnings.append(f"slab {s.tag}: no closed panel found around the tag")
             continue
@@ -154,11 +168,15 @@ def structural_to_measurement(res: StructuralReadResult, source_sheet: str, leve
         if s.rect_fill < 0.95:
             ev.append(f"not rectangular (fills {int(s.rect_fill * 100)}% of its rectangle); "
                       "length x width kept equal to the true area")
-        ex.slabs.append(SlabEl(tag=s.tag, length_m=b_m, width_m=round(width_m, 3),
-                               thickness_m=(s.thickness_mm or 150) / 1000, level=level,
-                               confidence=0.7 if s.flags else 0.9, evidence=ev + s.flags,
-                               source_sheet=source_sheet,
-                               outline=[list(q) for q in s.poly], flags=list(s.flags)))
+        # The panel is the area BETWEEN the beams, so there is no beam width left to take
+        # off the soffit shuttering (beam_width_m=0).
+        el = SlabEl(tag=s.tag, length_m=b_m, width_m=round(width_m, 3),
+                    thickness_m=(s.thickness_mm or 150) / 1000, level=level, beam_width_m=0,
+                    confidence=0.7 if s.flags else 0.9, evidence=ev + s.flags + ["panel between beams"],
+                    source_sheet=source_sheet,
+                    outline=[list(q) for q in s.poly], flags=list(s.flags))
+        ex.slabs.append(el)
+        res.element_ids[f"slab:{si}"] = el.id
 
     # The sheet merge dedupes elements by (tag, level): a second piece of the same
     # beam, or a second panel of the same slab mark, must keep its own row, so

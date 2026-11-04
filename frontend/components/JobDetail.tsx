@@ -134,7 +134,7 @@ export function JobDetail({ id }: { id: string }) {
       title: "Reprocess this job?",
       message:
         job.module === "measurement"
-          ? "The drawings are read again from scratch. Every element you corrected or added will be overwritten."
+          ? "The drawings are read again from scratch. Any element you corrected or added by hand will be overwritten. Your answers to questions are kept and applied again."
           : "The whole pipeline runs again from the uploaded drawings. Manual edits to members or items will be overwritten.",
       confirmLabel: "Reprocess",
       danger: true,
@@ -220,7 +220,7 @@ export function JobDetail({ id }: { id: string }) {
 
   const tabs: TabItem<TabKey>[] = isMeasurement
     ? [
-        { key: "review", label: "Review", count: reviewAttentionCount(job.elements) },
+        { key: "review", label: "Review", count: reviewAttentionCount(job) },
         { key: "measure", label: "Measurement Sheet", count: job.measurement?.blocks.length ?? 0 },
         { key: "boq", label: "BOQ", count: job.measurement?.boq.length ?? 0 },
         { key: "materials", label: "Materials", count: job.measurement?.materials.length ?? 0 },
@@ -382,7 +382,7 @@ export function JobDetail({ id }: { id: string }) {
         <div className="min-w-0">
           <Tabs items={tabs} value={tab} onChange={(k) => setTab(k)} className="mb-5" />
 
-          {isMeasurement && tab === "review" ? (processing ? <PendingPanel job={job} /> : <ReviewTab key={`${job.id}-${job.updated_at}`} job={job} />) : null}
+          {isMeasurement && tab === "review" ? (processing ? <PendingPanel job={job} /> : <ReviewTab key={`${job.id}-${job.updated_at}`} job={job} onJobUpdate={setJob} readOnly={readOnly} readOnlyReason={readOnlyReason} />) : null}
           {isMeasurement && tab === "measure" ? job.measurement ? <MeasurementSheetTab measurement={job.measurement} /> : <PendingPanel job={job} /> : null}
           {isMeasurement && tab === "boq" ? job.measurement ? <MeasurementBOQTab boq={job.measurement.boq} /> : <PendingPanel job={job} /> : null}
           {isMeasurement && tab === "materials" ? job.measurement ? <MaterialsTab materials={job.measurement.materials} /> : <PendingPanel job={job} /> : null}

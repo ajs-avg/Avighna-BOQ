@@ -71,9 +71,14 @@ export function formatBytes(bytes: number): string {
   return `${v < 10 ? v.toFixed(1) : Math.round(v)} ${units[i]}`;
 }
 
-function toDate(value: string | Date | null | undefined): Date | null {
+// The server sends UTC times with no zone mark ("2026-11-03T14:42:43.049"). A browser reads a
+// bare date-time like that as *local* time, which put every time 5½ hours off in India.
+const UTC_WITHOUT_ZONE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d+)?)?$/;
+
+/** A time from the server as a Date (zone-less times are UTC). */
+export function toDate(value: string | Date | null | undefined): Date | null {
   if (!value) return null;
-  const d = value instanceof Date ? value : new Date(value);
+  const d = value instanceof Date ? value : new Date(UTC_WITHOUT_ZONE.test(value) ? `${value}Z` : value);
   return Number.isNaN(d.getTime()) ? null : d;
 }
 
