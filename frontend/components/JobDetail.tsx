@@ -134,7 +134,7 @@ export function JobDetail({ id }: { id: string }) {
       title: "Reprocess this job?",
       message:
         job.module === "measurement"
-          ? "The drawings are read again from scratch. Every element you corrected or added will be overwritten."
+          ? "The drawings are read again from scratch. Any element you corrected or added by hand will be overwritten. Your answers to questions are kept and applied again."
           : "The whole pipeline runs again from the uploaded drawings. Manual edits to members or items will be overwritten.",
       confirmLabel: "Reprocess",
       danger: true,
