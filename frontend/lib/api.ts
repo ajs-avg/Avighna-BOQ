@@ -1,10 +1,12 @@
 import { clearSession, getToken, redirectToLogin } from "./auth";
 import type {
   AIStatus,
+  AnswerBody,
   AuditListResponse,
   CreateJobResponse,
   FitoutItem,
   HealthResponse,
+  Interpretation,
   InviteRequest,
   InviteResponse,
   JobListResponse,
@@ -314,6 +316,33 @@ export const deleteItem = (jobId: string, itemId: string) =>
  */
 export const putElements = (jobId: string, elements: MeasurementExtraction) =>
   apiFetch<JobRecord>(`/api/v1/jobs/${encodeURIComponent(jobId)}/elements`, { method: "PUT", body: { elements } });
+
+// review questions
+/** The highlighted crop of the drawing for one question, as an object URL (caller revokes). */
+export async function getQuestionPictureUrl(jobId: string, questionId: string): Promise<string> {
+  const res = await apiRequest(
+    `/api/v1/jobs/${encodeURIComponent(jobId)}/questions/${encodeURIComponent(questionId)}/picture`,
+    { headers: { Accept: "image/png,image/*" } },
+  );
+  return URL.createObjectURL(await res.blob());
+}
+
+/** Understand a typed answer. Changes nothing; the person confirms with `answerQuestion`. */
+export const interpretAnswer = (jobId: string, questionId: string, text: string) =>
+  apiFetch<Interpretation>(`/api/v1/jobs/${encodeURIComponent(jobId)}/questions/${encodeURIComponent(questionId)}/interpret`, {
+    method: "POST",
+    body: { text },
+  });
+
+/** Apply a confirmed answer: elements change, the decision is recorded, quantities recompute. */
+export const answerQuestion = (jobId: string, questionId: string, body: AnswerBody) =>
+  apiFetch<JobRecord>(`/api/v1/jobs/${encodeURIComponent(jobId)}/questions/${encodeURIComponent(questionId)}/answer`, {
+    method: "POST",
+    body,
+  });
+
+export const undoDecision = (jobId: string, decisionId: string) =>
+  apiFetch<JobRecord>(`/api/v1/jobs/${encodeURIComponent(jobId)}/decisions/${encodeURIComponent(decisionId)}/undo`, { method: "POST" });
 
 // lifecycle
 export const recalculate = (jobId: string, body: { standards?: Standards; currency?: string } = {}) =>

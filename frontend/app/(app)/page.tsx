@@ -17,7 +17,7 @@ import { StatusPill } from "@/components/ui/StatusPill";
 import { EmptyRow, SkeletonRows, Table, TableWrap } from "@/components/ui/Table";
 import { listJobs } from "@/lib/api";
 import { isProcessing } from "@/lib/constants";
-import { formatInt, formatRelative } from "@/lib/format";
+import { formatInt, formatRelative, toDate } from "@/lib/format";
 import type { JobSummaryRecord } from "@/lib/types";
 import { useUser } from "@/lib/user-context";
 import { errorMessage } from "@/lib/utils";
@@ -49,8 +49,8 @@ export default function DashboardPage() {
     const now = new Date();
     const list = jobs ?? [];
     const thisMonth = list.filter((j) => {
-      const d = new Date(j.created_at);
-      return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth();
+      const d = toDate(j.created_at);
+      return !!d && d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth();
     }).length;
     // For measurement jobs `member_count` is the number of BOQ abstract lines.
     const boqItems = list

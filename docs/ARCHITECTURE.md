@@ -17,7 +17,11 @@ BOQ/
 │   │   │   └── structural/  geometric reader for structural DXF plans: exact text, column
 │   │   │                    hatches, beam line chains, the on-sheet beam/slab schedules as a
 │   │   │                    second source, slab panels, crossed-out blocks skipped, flags,
-│   │   │                    coloured check picture (per-consultant config in config.py)
+│   │   │                    coloured check picture (per-consultant config in config.py);
+│   │   │                    questions.py turns disagreements and open measuring rules into
+│   │   │                    plain-English review questions with a highlighted drawing crop
+│   │   ├── decisions.py     typed-answer interpretation (Gemini, else keyword rules), apply /
+│   │   │                    record / undo decisions, re-apply them after a re-read
 │   │   ├── ai/              Gemini client (auto model pick, strict JSON), prompts, mappers
 │   │   ├── engine/          deterministic maths: beam / slab / column / wall / stair BBS, BOQ
 │   │   ├── export/          Excel writers (BBS replica of Avighna's sheet, KR-style BOQ)
@@ -39,6 +43,10 @@ BOQ/
 4. When `ready`, reviewers edit members/items (`PATCH`), the engine recalculates instantly, a
    reviewer approves (`POST /approve`) or sends back with a reason (`POST /reject`), and anyone
    downloads the Excel (`GET /export.xlsx`). Every sensitive action lands in `audit_log`.
+5. Where the drawing does not settle a measurement, the Review tab asks "Questions for you", each with a
+   highlighted crop of the drawing. Typed answers are interpreted and said back first; only a confirmed answer
+   changes the elements, and it is kept as a decision (who, when, their words, undo) that is re-applied after
+   a re-read. See "Review questions and decisions" in docs/API_CONTRACT.md.
 
 ## Pipeline stages (backend/app/pipeline.py)
 | Stage | What happens | Where |

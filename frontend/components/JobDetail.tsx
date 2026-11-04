@@ -220,7 +220,7 @@ export function JobDetail({ id }: { id: string }) {
 
   const tabs: TabItem<TabKey>[] = isMeasurement
     ? [
-        { key: "review", label: "Review", count: reviewAttentionCount(job.elements) },
+        { key: "review", label: "Review", count: reviewAttentionCount(job) },
         { key: "measure", label: "Measurement Sheet", count: job.measurement?.blocks.length ?? 0 },
         { key: "boq", label: "BOQ", count: job.measurement?.boq.length ?? 0 },
         { key: "materials", label: "Materials", count: job.measurement?.materials.length ?? 0 },
@@ -382,7 +382,7 @@ export function JobDetail({ id }: { id: string }) {
         <div className="min-w-0">
           <Tabs items={tabs} value={tab} onChange={(k) => setTab(k)} className="mb-5" />
 
-          {isMeasurement && tab === "review" ? (processing ? <PendingPanel job={job} /> : <ReviewTab key={`${job.id}-${job.updated_at}`} job={job} />) : null}
+          {isMeasurement && tab === "review" ? (processing ? <PendingPanel job={job} /> : <ReviewTab key={`${job.id}-${job.updated_at}`} job={job} onJobUpdate={setJob} readOnly={readOnly} readOnlyReason={readOnlyReason} />) : null}
           {isMeasurement && tab === "measure" ? job.measurement ? <MeasurementSheetTab measurement={job.measurement} /> : <PendingPanel job={job} /> : null}
           {isMeasurement && tab === "boq" ? job.measurement ? <MeasurementBOQTab boq={job.measurement.boq} /> : <PendingPanel job={job} /> : null}
           {isMeasurement && tab === "materials" ? job.measurement ? <MaterialsTab materials={job.measurement.materials} /> : <PendingPanel job={job} /> : null}

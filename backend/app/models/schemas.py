@@ -496,6 +496,8 @@ class JobRecord(BaseModel):
     boq: Optional[BOQResult] = None
     elements: Optional["MeasurementExtraction"] = None
     measurement: Optional["MeasurementResult"] = None
+    questions: List["ReviewQuestion"] = Field(default_factory=list, description="Open and answered review questions")
+    decisions: List["Decision"] = Field(default_factory=list, description="Confirmed answers, newest last (kept across reprocess)")
     general_notes: GeneralNotes = Field(default_factory=GeneralNotes)
     sheet_count: int = 0
     events: List[JobEvent] = Field(default_factory=list)
@@ -669,6 +671,8 @@ class SlabEl(BaseModel):
     count: int = Field(1, ge=1)
     level: str = ""
     beam_width_m: float = Field(0.23, ge=0, description="Beam width to subtract from soffit formwork")
+    soffit_formwork: bool = Field(True, description="False for concrete with nothing underneath to shutter "
+                                                    "(e.g. the strip of slab over the beams under IS 1200)")
     confidence: float = 0.5
     evidence: List[str] = Field(default_factory=list)
     source_sheet: Optional[str] = None
@@ -849,6 +853,124 @@ class MeasurementResult(BaseModel):
 class ElementsUpdate(BaseModel):
     """Whole element set after reviewer edits (PUT /jobs/{id}/elements)."""
     elements: MeasurementExtraction
+
+
+# ---- questions & decisions --------------------------------------------------
+# The reader turns every disagreement or open measuring rule into a plain-English
+# question with a highlighted crop of the drawing. A person answers with a button
+# or in their own words; free text is only *interpreted* (AI or keyword rules) and
+# restated, and nothing is applied until the person confirms. Each confirmed
+# answer is a Decision: who, when, the exact words, what changed (for undo).
+ElementField = Literal["width_m", "depth_m", "length_m", "thickness_m", "slab_thickness_m", "height_m"]
+
+
+class QuestionChange(BaseModel):
+    """One element edit an answer makes. Exactly one of value / delta / add / remove applies."""
+    element_id: str
+    list_name: Literal["members", "walls", "slabs"] = "members"
+    field: Optional[ElementField] = None
+    value: Optional[float] = None        # set the field to this
+    delta: Optional[float] = None        # add this to the field (rules: +0.31 m on B59)
+    remove: bool = False                 # drop the element (e.g. "that hatch is not a column")
+    add: Optional[Dict[str, Any]] = None  # insert this element (e.g. IS 1200 slab strip over beams)
+
+
+class QuestionOption(BaseModel):
+    id: str                               # stable across re-reads: "schedule", "drawing", "shorter"...
+    label: str                            # button text, plain English
+    detail: str = ""                      # what changes, in numbers
+    changes: List[QuestionChange] = Field(default_factory=list)
+    current: bool = False                 # what the system does today when nobody answers
+    recommended: bool = False
+    keywords: List[str] = Field(default_factory=list)      # words that point to this option in a typed answer
+    values_mm: Dict[str, float] = Field(default_factory=dict)  # numbers that identify it ("width_m": 300)
+
+
+class CustomField(BaseModel):
+    field: ElementField
+    label: str                            # "Width"
+    unit: str = "mm"
+    min_mm: float = 1
+    max_mm: float = 20000
+
+
+class QuestionCustom(BaseModel):
+    """Numbers the person may type instead of picking an option ("it's 250 x 600", "stop 180 mm short")."""
+    prompt: str                           # "Or type the real size"
+    fields: List[CustomField]
+    mode: Literal["set", "shorten"] = "set"   # shorten: the typed mm come off each element's length
+    element_ids: List[str] = Field(default_factory=list)
+    list_name: Literal["members", "walls", "slabs"] = "members"
+
+
+class ReviewQuestion(BaseModel):
+    id: str = Field(default_factory=new_id)
+    key: str                              # stable across re-reads, e.g. "beam-width:B63", "rule:corner"
+    kind: Literal["element", "rule"] = "element"
+    topic: str                            # short heading: "Beam size", "Corner rule"
+    title: str                            # "B63 — which width is right?"
+    question: str                         # the plain-English question
+    why: str = ""                         # why it matters, one or two sentences
+    element_ids: List[str] = Field(default_factory=list)
+    element_tags: List[str] = Field(default_factory=list)
+    options: List[QuestionOption] = Field(default_factory=list)
+    custom: Optional[QuestionCustom] = None
+    picture_path: Optional[str] = None    # highlighted crop of the drawing (storage key)
+    source_sheet: Optional[str] = None
+    status: Literal["open", "answered", "resolved_by_edit"] = "open"
+    decision_id: Optional[str] = None
+
+
+class AppliedChange(BaseModel):
+    """What an answer actually changed, with the old value, so it can be undone."""
+    element_id: str
+    list_name: Literal["members", "walls", "slabs"] = "members"
+    tag: str = ""
+    field: Optional[str] = None
+    before: Optional[float] = None
+    after: Optional[float] = None
+    removed: Optional[Dict[str, Any]] = None   # snapshot of a removed element
+    added: bool = False
+    flags_before: Optional[List[str]] = None
+    confidence_before: Optional[float] = None
+
+
+class Decision(BaseModel):
+    id: str = Field(default_factory=new_id)
+    question_id: str
+    question_key: str
+    option_id: Optional[str] = None
+    custom_values: Dict[str, float] = Field(default_factory=dict)   # field -> mm, when a number was typed
+    answer_text: str                      # the person's own words (or the button they pressed)
+    understood_as: str                    # the restatement the person confirmed
+    interpreted_by: Literal["button", "ai", "rules"] = "button"
+    applied: List[AppliedChange] = Field(default_factory=list)
+    decided_by: str = ""
+    decided_at: datetime = Field(default_factory=datetime.utcnow)
+    undone: bool = False
+    undone_by: Optional[str] = None
+    undone_at: Optional[datetime] = None
+
+
+class InterpretRequest(BaseModel):
+    text: str = Field(min_length=1, max_length=2000)
+
+
+class Interpretation(BaseModel):
+    understood: bool
+    option_id: Optional[str] = None
+    custom_values: Dict[str, float] = Field(default_factory=dict)
+    understood_as: str = ""               # "Use the schedule width (230 mm) for B63."
+    message: str = ""                     # when not understood: what to try instead
+    via: Literal["ai", "rules"] = "rules"
+
+
+class AnswerRequest(BaseModel):
+    option_id: Optional[str] = None
+    custom_values: Dict[str, float] = Field(default_factory=dict)
+    answer_text: str = Field("", max_length=2000)
+    understood_as: str = Field("", max_length=1000)
+    interpreted_by: Literal["button", "ai", "rules"] = "button"
 
 
 JobRecord.model_rebuild()

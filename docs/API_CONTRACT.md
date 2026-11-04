@@ -188,3 +188,50 @@ image, `full` returns the full-resolution PNG when it exists and otherwise falls
 404 just because the job predates full renders). Response carries `Cache-Control: private, max-age=3600`.
 The job page shows the first sheet in a "Drawing preview" card above the pipeline; clicking opens a
 lightbox that requests `size=full` and supports zoom (wheel, buttons, fit, 100 %) and pan.
+
+
+### Review questions and decisions
+
+When the structural reader meets something the drawing does not settle (a beam drawn at one size while the
+schedule says another, a beam with no size anywhere, a filled column shape with no name, or an open measuring
+rule such as slab-over-beam under IS 1200, corner ownership, or where beams stop at a pardi), it stores a
+`ReviewQuestion` on the job with a highlighted crop of the drawing. The Review tab shows them as
+"Questions for you". A person answers with a button or in their own words.
+
+| Method | Path | Body | Returns | Notes |
+|---|---|---|---|---|
+| GET | `/api/v1/jobs/{id}/questions/{qid}/picture` | — | image/png | the crop of the drawing with the asked-about part highlighted |
+| POST | `/api/v1/jobs/{id}/questions/{qid}/interpret` | `{text}` | `Interpretation` | **changes nothing**; Gemini when configured, else keyword/number rules (also the fallback if the AI fails) |
+| POST | `/api/v1/jobs/{id}/questions/{qid}/answer` | `AnswerRequest` | `JobRecord` (recalculated) | 409 if already answered, 422 if the answer is not valid for the question |
+| POST | `/api/v1/jobs/{id}/decisions/{did}/undo` | — | `JobRecord` (recalculated) | restores every value the decision changed; the question opens again |
+
+Rules:
+- Free text is only interpreted. The restatement (`understood_as`) is built from the structured choice, not
+  from model prose, and nothing is applied until the person confirms with `.../answer`.
+- Options carry exact element edits (`QuestionChange`), so the same answer always makes the same change.
+- Each confirmed answer is a `Decision`: who, when, the exact words, what it was understood as, and every value
+  before/after (for undo). It is also written to the job events and `audit_log`.
+- Re-processing a job re-applies live decisions by question `key` (stable across re-reads, e.g.
+  `beam-width:B63`, `rule:corner`), so answers survive a fresh read of the drawing.
+- A hand edit on the Elements tab that removes the element or clears its flags closes its open element
+  questions as `resolved_by_edit`.
+- IS 1200 slab-over-beam: the beams get `slab_thickness_m` (beam measured only below the slab) and
+  "Over beams (t mm)" slab strips are added with `soffit_formwork = false`, so concrete moves from beams to
+  slabs with the total unchanged and no slab soffit shuttering is added over beams.
+- Server times are UTC without a zone mark (`2026-11-03T14:42:43`); the frontend reads them as UTC (`toDate` in
+  `lib/format.ts`).
+
+```ts
+type ElementField = 'width_m'|'depth_m'|'length_m'|'thickness_m'|'slab_thickness_m'|'height_m';
+interface QuestionChange { element_id:string; list_name:'members'|'walls'|'slabs'; field?:ElementField|null; value?:number|null; delta?:number|null; remove:boolean; add?:Record<string,unknown>|null }
+interface QuestionOption { id:string; label:string; detail:string; changes:QuestionChange[]; current:boolean; recommended:boolean; keywords:string[]; values_mm:Record<string,number> }
+interface CustomField { field:ElementField; label:string; unit:string; min_mm:number; max_mm:number }
+interface QuestionCustom { prompt:string; fields:CustomField[]; mode:'set'|'shorten'; element_ids:string[]; list_name:'members'|'walls'|'slabs' }
+interface ReviewQuestion { id:string; key:string; kind:'element'|'rule'; topic:string; title:string; question:string; why:string; element_ids:string[]; element_tags:string[]; options:QuestionOption[]; custom?:QuestionCustom|null; picture_path?:string|null; source_sheet?:string|null; status:'open'|'answered'|'resolved_by_edit'; decision_id?:string|null }
+interface AppliedChange { element_id:string; list_name:string; tag:string; field?:string|null; before?:number|null; after?:number|null; removed?:Record<string,unknown>|null; added:boolean; flags_before?:string[]|null; confidence_before?:number|null }
+interface Decision { id:string; question_id:string; question_key:string; option_id?:string|null; custom_values:Record<string,number>; answer_text:string; understood_as:string; interpreted_by:'button'|'ai'|'rules'; applied:AppliedChange[]; decided_by:string; decided_at:string; undone:boolean; undone_by?:string|null; undone_at?:string|null }
+interface Interpretation { understood:boolean; option_id?:string|null; custom_values:Record<string,number>; understood_as:string; message:string; via:'ai'|'rules' }
+interface AnswerRequest { option_id?:string|null; custom_values?:Record<string,number>; answer_text?:string; understood_as?:string; interpreted_by?:'button'|'ai'|'rules' }
+// JobRecord += questions: ReviewQuestion[]; decisions: Decision[]
+// SlabEl  += soffit_formwork: boolean (default true)
+```

@@ -216,6 +216,8 @@ def compute_measurement(ex: MeasurementExtraction, norms: Optional[Dict[str, lis
         thk_mm = int(round(s.thickness_m * 1000))
         c = blk("RCC-SLAB", f"RCC {a.concrete_grade} in slabs {thk_mm} mm thick, incl. pumping, vibrating and curing (excl. steel and formwork)", "cum", "RCC")
         c.add(loc(f"Slab {s.tag} ({s.length_m:.2f} x {s.width_m:.2f})", "", s.level), s.count, s.length_m, s.width_m, s.thickness_m, "measured over beams (IS 1200 Pt 2)", s.id)
+        if not s.soffit_formwork:   # e.g. the slab strip over beams: the beam is underneath, nothing to shutter
+            continue
         f = blk("FW-SLAB", "Formwork to slab soffit incl. props and de-shuttering", "sqm", "RCC")
         f.add(loc(f"Slab {s.tag} soffit between beams", "", s.level), s.count, max(s.length_m - s.beam_width_m, 0), max(s.width_m - s.beam_width_m, 0), None,
               "soffit only, beam widths excluded (Pt 5)", s.id)
